@@ -74,8 +74,6 @@ function LessonSelector() {
     );
 }
 
-// ... (ErrorBoundary)
-
 // Mission Definitions
 const MISSION_INFO: Record<string, { title: string, desc: string }> = {
     'straight': { title: '直線走行', desc: '基本の直線走行です。ハンドルを安定させ、一定の速度で走り抜けましょう。' },
@@ -142,7 +140,7 @@ function MissionOverlay() {
     );
 }
 
-// ... (ErrorBoundary)
+
 
 export default function ClientApp() {
   return (

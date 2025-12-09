@@ -84,7 +84,11 @@ export default function VisionController() {
         video: { width: 640, height: 480 }
       });
       videoRef.current.srcObject = stream;
-      await videoRef.current.play(); // Explicit play
+      try {
+          await videoRef.current.play(); // Explicit play
+      } catch (e) {
+          console.warn("Video play interrupted or failed:", e);
+      }
       videoRef.current.addEventListener("loadeddata", predictWebcam);
       setWebcamRunning(true);
     } catch (err) {
@@ -165,8 +169,8 @@ export default function VisionController() {
           let leftHandLandmarks = result.landmarks[0];
           let rightHandLandmarks = result.landmarks[1];
           
-          const label0 = result.handedness[0][0].categoryName;
-          const label1 = result.handedness[1][0].categoryName;
+          const label0 = result.handedness[0]?.[0]?.categoryName ?? 'Left';
+          const label1 = result.handedness[1]?.[0]?.categoryName ?? 'Right';
 
           if (label0 !== label1) {
               // We have distinct hands
