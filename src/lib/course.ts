@@ -6,29 +6,29 @@ export function getCoursePath(lesson: 'straight' | 's-curve' | 'crank' | 'left-t
     if (lesson === 'left-turn') {
         // Straight approach
         path.add(new THREE.LineCurve3(new THREE.Vector3(0, 0, 20), new THREE.Vector3(0, 0, -30)));
-        // Left Turn (90 deg)
-        // From (0,0,-30) to (-15, 0, -45) ? curve center at (-15, 0, -30) radius 15
+        // Left Turn (Sharp 90 deg)
+        // Corner approx 8m radius
         const curve = new THREE.QuadraticBezierCurve3(
             new THREE.Vector3(0, 0, -30),
-            new THREE.Vector3(0, 0, -45), // Control point corner
-            new THREE.Vector3(-15, 0, -45) // End point
+            new THREE.Vector3(0, 0, -38), // Corner
+            new THREE.Vector3(-8, 0, -38) // End point
         );
         path.add(curve);
         // Straight exit
-        path.add(new THREE.LineCurve3(new THREE.Vector3(-15, 0, -45), new THREE.Vector3(-60, 0, -45)));
+        path.add(new THREE.LineCurve3(new THREE.Vector3(-8, 0, -38), new THREE.Vector3(-60, 0, -38)));
 
     } else if (lesson === 'right-turn') {
         // Straight approach
         path.add(new THREE.LineCurve3(new THREE.Vector3(0, 0, 20), new THREE.Vector3(0, 0, -30)));
-        // Right Turn (90 deg)
+        // Right Turn (Sharp 90 deg)
         const curve = new THREE.QuadraticBezierCurve3(
             new THREE.Vector3(0, 0, -30),
-            new THREE.Vector3(0, 0, -45), 
-            new THREE.Vector3(15, 0, -45) 
+            new THREE.Vector3(0, 0, -38), 
+            new THREE.Vector3(8, 0, -38) 
         );
         path.add(curve);
         // Straight exit
-        path.add(new THREE.LineCurve3(new THREE.Vector3(15, 0, -45), new THREE.Vector3(60, 0, -45)));
+        path.add(new THREE.LineCurve3(new THREE.Vector3(8, 0, -38), new THREE.Vector3(60, 0, -38)));
 
     } else if (lesson === 's-curve') {
         const curve1 = new THREE.CatmullRomCurve3([

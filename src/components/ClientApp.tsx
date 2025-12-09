@@ -76,10 +76,79 @@ function LessonSelector() {
 
 // ... (ErrorBoundary)
 
+// Mission Definitions
+const MISSION_INFO: Record<string, { title: string, desc: string }> = {
+    'straight': { title: '直線走行', desc: '基本の直線走行です。ハンドルを安定させ、一定の速度で走り抜けましょう。' },
+    'left-turn': { title: '左折', desc: '交差点を左折します。速度を十分に落とし、巻き込みに注意して曲がりましょう。' },
+    'right-turn': { title: '右折', desc: '交差点を右折します。交差点の中心のすぐ内側を通るように意識しましょう。' },
+    's-curve': { title: 'S字カーブ', desc: 'S字型の狭路です。内輪差・外輪差を考慮し、脱輪しないように慎重に進みましょう。' },
+    'crank': { title: 'クランク', desc: '直角に曲がる狭路です。車両感覚を研ぎ澄まし、適切なタイミングでハンドルを切りましょう。' }
+};
+
+function MissionOverlay() {
+    const currentLesson = useDrivingStore(state => state.currentLesson);
+    const missionState = useDrivingStore(state => state.missionState);
+    const setMissionState = useDrivingStore(state => state.setMissionState);
+
+    if (missionState !== 'briefing') return null;
+
+    const info = MISSION_INFO[currentLesson] || { title: currentLesson, desc: '' };
+
+    return (
+        <div style={{
+            position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            zIndex: 100, // Topmost
+            display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+            color: 'white'
+        }}>
+            <div style={{
+                backgroundColor: '#1e293b',
+                padding: '40px',
+                borderRadius: '16px',
+                textAlign: 'center',
+                maxWidth: '600px',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                border: '1px solid #334155'
+            }}>
+                <h2 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '20px', color: '#60a5fa' }}>
+                    MISSION: {info.title}
+                </h2>
+                <p style={{ fontSize: '18px', lineHeight: '1.6', marginBottom: '40px', color: '#cbd5e1' }}>
+                    {info.desc}
+                </p>
+                
+                <button 
+                    onClick={() => setMissionState('active')}
+                    style={{
+                        padding: '12px 40px',
+                        fontSize: '20px',
+                        fontWeight: 'bold',
+                        color: 'white',
+                        backgroundColor: '#2563eb',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        transition: 'background 0.2s',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'}
+                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+                >
+                    ミッション開始
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// ... (ErrorBoundary)
+
 export default function ClientApp() {
   return (
     <ErrorBoundary>
         <div style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden' }}>
+          <MissionOverlay />
           <LessonSelector />
           <VisionController />
           <KeyboardControls />

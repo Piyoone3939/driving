@@ -156,29 +156,66 @@ export default function VisionController() {
       const hands = result.landmarks.length;
       let info = `Hands: ${hands}`;
 
-      if (hands === 2) {
-          // Two hands - steering logic
-          const hand1 = result.landmarks[0][9]; // Middle finger knuckle
-          const hand2 = result.landmarks[1][9];
+      if (hands === 2 && result.handedness.length === 2) {
+          // Identify Left and Right hands using Handedness
+          // Note: In Selfie mode (mirrored), MediaPipe 'Left' hand is usually the user's Left hand (appearing on left).
+          // But sometimes it's inverted depending on model config.
+          // Let's rely on label.
           
-          // Determine left/right by X coordinate
-          // In screen coordinates (0-1), X increases to the right.
-          // The hand with smaller X is on the left.
-          const [left, right] = hand1.x < hand2.x ? [hand1, hand2] : [hand2, hand1];
+          let leftHandLandmarks = result.landmarks[0];
+          let rightHandLandmarks = result.landmarks[1];
+          
+          const label0 = result.handedness[0][0].categoryName;
+          const label1 = result.handedness[1][0].categoryName;
+
+          if (label0 !== label1) {
+              // We have distinct hands
+              if (label0 === 'Left') {
+                  leftHandLandmarks = result.landmarks[0];
+                  rightHandLandmarks = result.landmarks[1];
+              } else {
+                  leftHandLandmarks = result.landmarks[1];
+                  rightHandLandmarks = result.landmarks[0];
+              }
+          } else {
+              // Fallback to X-sorting if labels are same or unsure
+              const h1 = result.landmarks[0][9];
+              const h2 = result.landmarks[1][9];
+              if (h1.x < h2.x) {
+                  leftHandLandmarks = result.landmarks[0];
+                  rightHandLandmarks = result.landmarks[1];
+              } else {
+                  leftHandLandmarks = result.landmarks[1];
+                  rightHandLandmarks = result.landmarks[0];
+              }
+          }
+
+          const left = leftHandLandmarks[9]; // Middle Knuckle
+          const right = rightHandLandmarks[9];
           
           const dy = right.y - left.y;
           const dx = right.x - left.x;
           
           const angle = Math.atan2(dy, dx);
-          const sensitivity = 2.0;
-          // Invert angle because of camera mirroring (Screen Left = Physical Right)
-          const steering = Math.max(-1, Math.min(1, -angle * sensitivity));
+          // Angle 0 is Horizontal (Right hand exactly right of Left hand)
+          // Positive Angle (dy>0) -> Right hand is Lower -> Right Turn
+          // Negative Angle (dy<0) -> Right hand is Higher -> Left Turn
+          
+          const sensitivity = 2.5; 
+          // We want Left Turn (Neg Angle) to give Negative Steering (to match Rotation logic in Car '+=')
+          // Wait, Car uses '-=' steering.
+          // So Negative Steering -> Positive Rotation (Left). Correct.
+          // So we pass 'angle' directly?
+          // If angle is -0.5 (Left Turn), steering is -0.5.
+          // Car: rotation.y -= (-0.5) => rotation.y += 0.5 (Turn Left). Correct.
+          
+          const steering = Math.max(-1, Math.min(1, angle * sensitivity));
           
           setSteering(steering);
           
-          info += ` | Angle: ${(-angle).toFixed(2)} | Str: ${steering.toFixed(2)}`;
+          info += ` | Ang: ${angle.toFixed(2)} | Str: ${steering.toFixed(2)}`;
       } else {
-          setSteering(0); // Reset if not two hands
+          setSteering(0);
           info += " | Need 2 hands";
       }
       

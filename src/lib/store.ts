@@ -13,6 +13,7 @@ interface DrivingState {
   speed: number; // Current speed (arbitrary units or km/h)
   gear: 'P' | 'D' | 'R';
   currentLesson: 'straight' | 's-curve' | 'crank' | 'left-turn' | 'right-turn';
+  missionState: 'idle' | 'briefing' | 'active'; // Logic for screen transitions
   isOffTrack: boolean;
 
   // System
@@ -24,6 +25,7 @@ interface DrivingState {
   setPedals: (throttle: number, brake: number) => void;
   setSpeed: (speed: number) => void;
   setLesson: (lesson: 'straight' | 's-curve' | 'crank' | 'left-turn' | 'right-turn') => void;
+  setMissionState: (state: 'idle' | 'briefing' | 'active') => void;
   setOffTrack: (isOff: boolean) => void;
   setHeadRotation: (rotation: { pitch: number; yaw: number; roll: number }) => void;
   setVisionReady: (ready: boolean) => void;
@@ -39,6 +41,7 @@ export const useDrivingStore = create<DrivingState>((set) => ({
   speed: 0,
   gear: 'D',
   currentLesson: 'straight',
+  missionState: 'briefing', // Start with briefing
   isOffTrack: false,
 
   isVisionReady: false,
@@ -47,7 +50,8 @@ export const useDrivingStore = create<DrivingState>((set) => ({
   setSteering: (val) => set({ steeringAngle: val }),
   setPedals: (throttle, brake) => set({ throttle, brake }),
   setSpeed: (speed) => set({ speed }),
-  setLesson: (lesson) => set({ currentLesson: lesson }),
+  setLesson: (lesson) => set({ currentLesson: lesson, missionState: 'briefing' }), // Reset to briefing when lesson changes
+  setMissionState: (state) => set({ missionState: state }),
   setOffTrack: (isOff) => set({ isOffTrack: isOff }),
   setHeadRotation: (rotation) => set({ headRotation: rotation }),
   setVisionReady: (ready) => set({ isVisionReady: ready }),
