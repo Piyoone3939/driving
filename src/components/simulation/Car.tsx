@@ -18,12 +18,12 @@ export function Car() {
 
   // Physics state
   const speed = useRef(0);
-  const maxSpeed = 0.5; // units per frame approx
+  const maxSpeed = 1.5; // units per frame approx
   const acceleration = 0.01;
   const friction = 0.005;
-  const turnSpeed = 0.04;
+  const turnSpeed = 0.05; // More sensitive steering
 
-  const creepSpeed = 0.02; // Automatic creep
+  const creepSpeed = 0.05; // Automatic creep faster
 
   useFrame((state, delta) => {
     if (!groupRef.current) return;
@@ -142,31 +142,55 @@ export function Car() {
 
 
       {/* Steering Wheel - Mazda-ish 3 Spoke */}
-      <group position={[0.35, 0.65, -0.4]} rotation={[0, 0, -steeringInput * 2.5]} >
-          {/* Rim */}
-          <mesh rotation={[Math.PI / 2, 0, 0]}>
-              <torusGeometry args={[0.19, 0.02, 16, 48]} />
-              <meshStandardMaterial color="#1a1a1a" roughness={0.4} />
-          </mesh>
-          {/* Center Module */}
-          <mesh position={[0, 0, 0]} rotation={[Math.PI/2, 0, 0]}>
-              <cylinderGeometry args={[0.06, 0.06, 0.04, 32]} />
-              <meshStandardMaterial color="#222" />
-          </mesh>
-          {/* Spokes */}
-          {/* Bottom Spoke */}
-          <mesh position={[0, -0.1, 0]} rotation={[0, 0, 0]}>
-              <boxGeometry args={[0.03, 0.18, 0.02]} />
-              <meshStandardMaterial color="#333" metalness={0.5} />
-          </mesh>
-          {/* Side Spokes */}
-          <mesh position={[-0.1, 0.02, 0]} rotation={[0, 0, 1.3]}>
-              <boxGeometry args={[0.03, 0.18, 0.02]} />
-              <meshStandardMaterial color="#333" />
-          </mesh>
-          <mesh position={[0.1, 0.02, 0]} rotation={[0, 0, -1.3]}>
-              <boxGeometry args={[0.03, 0.18, 0.02]} />
-              <meshStandardMaterial color="#333" />
+      {/* Steering Wheel Assembly - Tilted Column */}
+      <group position={[0.35, 0.55, -0.35]} rotation={[-0.35, 0, 0]}> 
+          {/* Rotating Part (The Wheel itself) */}
+          <group rotation={[0, 0, steeringInput * 2.5]}>
+              {/* Rim */}
+              <mesh>
+                  <torusGeometry args={[0.19, 0.02, 16, 48]} />
+                  <meshStandardMaterial color="#1a1a1a" roughness={0.4} />
+              </mesh>
+              
+              {/* Center Module */}
+              <mesh rotation={[Math.PI/2, 0, 0]}>
+                  <cylinderGeometry args={[0.06, 0.06, 0.04, 32]} />
+                  <meshStandardMaterial color="#222" />
+              </mesh>
+              
+              {/* Spokes */}
+              {/* Bottom Spoke */}
+              <mesh position={[0, -0.1, 0]}>
+                  <boxGeometry args={[0.03, 0.18, 0.02]} />
+                  <meshStandardMaterial color="#333" metalness={0.5} />
+              </mesh>
+              {/* Side Spokes left/right */}
+              <mesh position={[-0.1, 0.02, 0]} rotation={[0, 0, 1.3]}>
+                  <boxGeometry args={[0.03, 0.18, 0.02]} />
+                  <meshStandardMaterial color="#333" />
+              </mesh>
+              <mesh position={[0.1, 0.02, 0]} rotation={[0, 0, -1.3]}>
+                  <boxGeometry args={[0.03, 0.18, 0.02]} />
+                  <meshStandardMaterial color="#333" />
+              </mesh>
+
+              {/* Hands - Visualizing "Firmly Holding" */}
+              {/* Left Hand (at roughly 9-10 o'clock) */}
+              <mesh position={[-0.18, 0.05, 0.05]}>
+                  <sphereGeometry args={[0.04, 16, 16]} />
+                  <meshStandardMaterial color="#f0c0a0" /> {/* Skin tone */}
+              </mesh>
+              {/* Right Hand (at roughly 2-3 o'clock) */}
+              <mesh position={[0.18, 0.05, 0.05]}>
+                  <sphereGeometry args={[0.04, 16, 16]} />
+                  <meshStandardMaterial color="#f0c0a0" />
+              </mesh>
+          </group>
+          
+          {/* Static Column Base (behind wheel) */}
+          <mesh position={[0, 0, -0.1]} rotation={[Math.PI/2, 0, 0]}>
+             <cylinderGeometry args={[0.04, 0.04, 0.2, 16]} />
+             <meshStandardMaterial color="#111" />
           </mesh>
       </group>
     </group>

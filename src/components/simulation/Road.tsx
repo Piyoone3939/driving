@@ -18,10 +18,24 @@ export function Road() {
     // 1. Asphalt Road Surface
     const roadShape = new THREE.Shape();
     const width = 3.5; // Lane width approx
-    roadShape.moveTo(-width, 0);
-    roadShape.lineTo(width, 0);
-    roadShape.lineTo(width, 0.05); // Very thin
-    roadShape.lineTo(-width, 0.05);
+    // Define shape in "Side View" where Y is width and X is height (or vice versa? Extrude moves along Z).
+    // Standard Extrude: Shape X->X, Shape Y->Y.
+    // We want Result X=Width, Result Y=Height.
+    // If Path is along Z, and Frenet Frame is standard:
+    // Tangent=Z, Normal=X, Binormal=Y.
+    // So Shape X maps to Normal (World X), Shape Y maps to Binormal (World Y).
+    // So X should be Width, Y should be Height.
+    // WAIT. If that was true, the original code (X=Width, Y=Height) should have been correct for Straight.
+    // But Straight needed rotateZ(90). That means Shape X was mapping to World Y (Height).
+    // So Normal was Up?
+    // Let's TRY swapping them so Shape Y is Width.
+    // Shape Y maps to Binormal -> World Y? No.
+    // If X mapped to Y, then Y maps to -X or something?
+    // Let's define the shape such that "Width" is on Y, and "Height" is on X.
+    roadShape.moveTo(0, -width);
+    roadShape.lineTo(0, width);
+    roadShape.lineTo(0.05, width); // Height
+    roadShape.lineTo(0.05, -width);
 
     const roadGeo = new THREE.ExtrudeGeometry(roadShape, {
         extrudePath: path,
@@ -29,63 +43,46 @@ export function Road() {
         bevelEnabled: false
     });
     
-    // Fix orientation for Straight lines if ExtrudeGeometry messed up
-    if (currentLesson === 'straight') {
-         // It seems straight lines extrude vertically (Normal along X?)
-         // We rotate -90 degrees around Z axis to lay it flat??
-         // Or 90?
-         // Let's guess: "Thin wall stretching".
-         // Typically it stands up.
-         // Let's look at the shape: width 7, height 0.05.
-         // If it stands up, it's 7 high.
-         // We want 7 wide.
-         // Rotation by 90 deg (PI/2) should fix it.
-         roadGeo.rotateZ(Math.PI / 2);
-    }
+    // No rotations needed.
 
     // 2. Curbs (Side stones)
     const curbShape = new THREE.Shape();
     const curbW = 0.3;
     const curbH = 0.15;
-    // Left Curb
-    curbShape.moveTo(-width - curbW, 0);
-    curbShape.lineTo(-width, 0);
-    curbShape.lineTo(-width, curbH);
-    curbShape.lineTo(-width - curbW, curbH);
+    // Left Curb (relative to road width)
+    // Width is on Y axis now.
+    // Left means "Negative Y" (if Y is width).
+    curbShape.moveTo(0, -width - curbW);
+    curbShape.lineTo(0, -width);
+    curbShape.lineTo(curbH, -width);
+    curbShape.lineTo(curbH, -width - curbW);
     
     const rightCurbShape = new THREE.Shape();
-    rightCurbShape.moveTo(width, 0);
-    rightCurbShape.lineTo(width + curbW, 0);
-    rightCurbShape.lineTo(width + curbW, curbH);
-    rightCurbShape.lineTo(width, curbH);
+    rightCurbShape.moveTo(0, width);
+    rightCurbShape.lineTo(0, width + curbW);
+    rightCurbShape.lineTo(curbH, width + curbW);
+    rightCurbShape.lineTo(curbH, width);
     
     const curbGeo = new THREE.ExtrudeGeometry([curbShape, rightCurbShape], {
         extrudePath: path,
         steps: steps,
         bevelEnabled: false
     });
-    
-    if (currentLesson === 'straight') {
-         curbGeo.rotateZ(Math.PI / 2);
-    }
 
     // 3. Center Line
     const lineShape = new THREE.Shape();
     const lineW = 0.1;
-    lineShape.moveTo(-lineW, 0.06); // Slightly above road
-    lineShape.lineTo(lineW, 0.06);
-    lineShape.lineTo(lineW, 0.06); // Flat
-    lineShape.lineTo(-lineW, 0.06);
+    // Position slightly "above" road. Road is X=[0, 0.05]. Line should be X=0.06.
+    lineShape.moveTo(0.06, -lineW); 
+    lineShape.lineTo(0.06, lineW);
+    lineShape.lineTo(0.06, lineW); 
+    lineShape.lineTo(0.06, -lineW);
 
     const lineGeo = new THREE.ExtrudeGeometry(lineShape, {
         extrudePath: path,
         steps: steps,
         bevelEnabled: false
     });
-    
-    if (currentLesson === 'straight') {
-         lineGeo.rotateZ(Math.PI / 2);
-    }
 
     return { roadGeo, curbGeo, lineGeo };
     
@@ -96,12 +93,12 @@ export function Road() {
       {/* Ground (Grass) handled in Surroundings, but just in case of gaps */}
       {/* Road Asphalt */}
       <mesh geometry={roadGeo} receiveShadow>
-         <meshStandardMaterial color="#333333" roughness={0.8} />
+         <meshStandardMaterial color="#333333" roughness={0.8} side={THREE.DoubleSide} />
       </mesh>
 
       {/* Curbs (Concrete) */}
       <mesh geometry={curbGeo} receiveShadow castShadow>
-         <meshStandardMaterial color="#999999" roughness={0.9} />
+         <meshStandardMaterial color="#999999" roughness={0.9} side={THREE.DoubleSide} />
       </mesh>
 
       {/* Center Line (White) */}
@@ -111,7 +108,7 @@ export function Road() {
          Let's assume white center line.
       */}
       <mesh geometry={lineGeo}>
-         <meshBasicMaterial color="#ffffff" />
+         <meshBasicMaterial color="#ffffff" side={THREE.DoubleSide} />
       </mesh>
     </group>
   );

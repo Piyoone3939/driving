@@ -12,7 +12,7 @@ interface DrivingState {
   // Vehicle Telemetry
   speed: number; // Current speed (arbitrary units or km/h)
   gear: 'P' | 'D' | 'R';
-  currentLesson: 'straight' | 's-curve' | 'crank';
+  currentLesson: 'straight' | 's-curve' | 'crank' | 'left-turn' | 'right-turn';
   isOffTrack: boolean;
 
   // System
@@ -23,7 +23,7 @@ interface DrivingState {
   setSteering: (val: number) => void;
   setPedals: (throttle: number, brake: number) => void;
   setSpeed: (speed: number) => void;
-  setLesson: (lesson: 'straight' | 's-curve' | 'crank') => void;
+  setLesson: (lesson: 'straight' | 's-curve' | 'crank' | 'left-turn' | 'right-turn') => void;
   setOffTrack: (isOff: boolean) => void;
   setHeadRotation: (rotation: { pitch: number; yaw: number; roll: number }) => void;
   setVisionReady: (ready: boolean) => void;

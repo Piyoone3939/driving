@@ -43,7 +43,15 @@ function LessonSelector() {
     
     return (
         <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 60, display: 'flex', gap: '10px' }}>
-            {['straight'].map((lesson) => (
+            {(['straight', 'left-turn', 'right-turn'] as const).map((lesson) => {
+                const labels: Record<string, string> = {
+                    'straight': '直線',
+                    'left-turn': '左折',
+                    'right-turn': '右折',
+                    's-curve': 'S字',
+                    'crank': 'クランク'
+                };
+                return (
                 <button 
                     key={lesson}
                     onClick={() => setLesson(lesson as any)}
@@ -56,12 +64,12 @@ function LessonSelector() {
                         cursor: 'pointer',
                         fontSize: '14px',
                         fontWeight: 'bold',
-                        textTransform: 'capitalize'
                     }}
                 >
-                    {lesson}
+                    {labels[lesson] || lesson}
                 </button>
-            ))}
+                );
+            })}
         </div>
     );
 }
@@ -87,8 +95,8 @@ export default function ClientApp() {
               pointerEvents: 'none',
               userSelect: 'none'
           }}>
-            <h1 style={{ fontSize: '24px', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>Virtual Driving School</h1>
-            <p style={{ fontSize: '14px', opacity: 0.8, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>Initialize Camera... Hold hands up to steer. W/S to move.</p>
+            <h1 style={{ fontSize: '24px', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>バーチャル教習所</h1>
+            <p style={{ fontSize: '14px', opacity: 0.8, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>カメラを起動中... 手を上げてハンドル操作、W/Sキーでアクセル/ブレーキ</p>
           </div>
 
           <div style={{ width: '100%', height: '100%', zIndex: 0 }}>
