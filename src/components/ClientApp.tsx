@@ -4,7 +4,7 @@ import { useDrivingStore } from '@/lib/store';
 import KeyboardControls from '@/components/simulation/KeyboardControls';
 import { Dashboard } from '@/components/ui/Dashboard';
 import dynamic from 'next/dynamic';
-import { Suspense, Component, ReactNode } from 'react';
+import { Suspense, Component, ReactNode, useState } from 'react';
 
 const VisionController = dynamic(() => import('@/components/vision/VisionController'), { ssr: false });
 const Scene = dynamic(() => import('@/components/simulation/Scene').then(mod => mod.Scene), { ssr: false });
@@ -143,9 +143,38 @@ function MissionOverlay() {
 
 
 export default function ClientApp() {
+    const [isPaused, setIsPaused] = useState(false);
+
+  // クリックした時の動作（ボタンの上でクリックした時は反応しないようにする工夫付き）
+  const handleGlobalClick = (e: React.MouseEvent) => {
+    // もしクリックした場所が「ボタン」なら、一時停止機能は発動させない（ボタンの邪魔をしないため）
+    if ((e.target as HTMLElement).closest('button')) {
+      return;
+    }
+    setIsPaused(!isPaused);
+  };
   return (
     <ErrorBoundary>
-        <div style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden' }}>
+        <div onClick={handleGlobalClick} // ここにクリックイベントを仕込む
+        style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden',cursor: 'pointer' // クリックできることをマウスカーソルで教える
+            }}>
+            {/* 停止中に表示する「PAUSED」の膜 */}
+          {isPaused && (
+            <div style={{
+              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+              backgroundColor: 'rgba(0, 0, 0, 0.6)', // 画面を少し暗くする
+              zIndex: 999, // 最前面に表示
+              display: 'flex', justifyContent: 'center', alignItems: 'center',
+              pointerEvents: 'none', // 文字がクリックを邪魔しないように
+            }}>
+              <h1 style={{ 
+                color: 'white', fontSize: '80px', fontWeight: 'bold', letterSpacing: '10px',
+                textShadow: '0 0 20px rgba(255,255,255,0.5)'
+              }}>
+                PAUSED ⏸
+              </h1>
+            </div>
+          )}
           <MissionOverlay />
           <LessonSelector />
           <VisionController />
@@ -163,7 +192,8 @@ export default function ClientApp() {
               userSelect: 'none'
           }}>
             <h1 style={{ fontSize: '24px', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>バーチャル教習所</h1>
-            <p style={{ fontSize: '14px', opacity: 0.8, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>カメラを起動中... 手を上げてハンドル操作、W/Sキーでアクセル/ブレーキ</p>
+            <p style={{ fontSize: '14px', opacity: 0.8, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>画面クリックで一時停止 / 再開<br/>
+               カメラを起動中... 手を上げてハンドル操作</p>
           </div>
 
           <div style={{ width: '100%', height: '100%', zIndex: 0 }}>
