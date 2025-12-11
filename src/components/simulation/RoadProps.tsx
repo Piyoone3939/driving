@@ -78,8 +78,8 @@ function CurveMirror({ position }: { position: [number, number, number] }) {
             </mesh>
             {/* Mirror (Circle) */}
             <group position={[0, 2.8, 0]} rotation={[0, Math.PI / 4, 0]}>
-                <mesh rotation={[0, 0, 0]}>
-                    <cylinderGeometry args={[0.5, 0.5, 0.1, 32]} rotation={[Math.PI/2, 0, 0]} />
+                <mesh rotation={[Math.PI / 2, 0, 0]}>
+                    <cylinderGeometry args={[0.5, 0.5, 0.1, 32]} />
                     <meshStandardMaterial color="#f97316" />
                 </mesh>
                 <mesh position={[0, 0, 0.06]} rotation={[Math.PI/2, 0, 0]}>

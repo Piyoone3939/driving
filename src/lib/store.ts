@@ -25,23 +25,22 @@ interface DrivingState {
   speed: number; // Current speed (arbitrary units or km/h)
   gear: 'P' | 'D' | 'R';
   currentLesson: 'straight' | 's-curve' | 'crank' | 'left-turn' | 'right-turn';
-  missionState: 'idle' | 'briefing' | 'active' | 'success' | 'failed'; // Expanded states
- 
+  missionState: 'idle' | 'briefing' | 'active' | 'success' | 'failed'; 
   isOffTrack: boolean;
-  drivingFeedback: string | null; // For real-time feedback (e.g. "Stop!", "Good!")
+  drivingFeedback: string | null;
 
   // Replay System
   isReplaying: boolean;
   replayData: ReplayFrame[];
-  replayViewMode: 'chase' | 'driver'; // New state
+  replayViewMode: 'chase' | 'driver'; 
   
   // System
   isVisionReady: boolean;
   debugInfo: string;
 
   // Actions
-  setScreen: (screen: 'home' | 'driving' | 'feedback') => void; // New
-  setPaused: (paused: boolean) => void; // New
+  setScreen: (screen: 'home' | 'driving' | 'feedback') => void;
+  setPaused: (paused: boolean) => void;
   
   setSteering: (val: number) => void;
   setPedals: (throttle: number, brake: number) => void;
@@ -57,7 +56,7 @@ interface DrivingState {
   
   // Replay Actions
   setIsReplaying: (isReplaying: boolean) => void; 
-  setReplayViewMode: (mode: 'chase' | 'driver') => void; // New action
+  setReplayViewMode: (mode: 'chase' | 'driver') => void;
   addReplayFrame: (frame: ReplayFrame) => void; 
   clearReplayData: () => void; 
 }
@@ -74,8 +73,7 @@ export const useDrivingStore = create<DrivingState>((set) => ({
   speed: 0,
   gear: 'D',
   currentLesson: 'straight',
-  missionState: 'idle', // Changed default to idle
- 
+  missionState: 'idle', 
   isOffTrack: false,
   drivingFeedback: null,
 
@@ -96,7 +94,7 @@ export const useDrivingStore = create<DrivingState>((set) => ({
   setMissionState: (state) => set({ missionState: state }),
 
   setOffTrack: (isOff) => set({ isOffTrack: isOff }),
-  setDrivingFeedback: (msg: string | null) => set({ drivingFeedback: msg }), // New
+  setDrivingFeedback: (msg) => set({ drivingFeedback: msg }),
   setHeadRotation: (rotation) => set({ headRotation: rotation }),
   setVisionReady: (ready) => set({ isVisionReady: ready }),
   setDebugInfo: (info) => set({ debugInfo: info }),
