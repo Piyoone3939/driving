@@ -3,6 +3,9 @@
 import { useDrivingStore } from '@/lib/store';
 import KeyboardControls from '@/components/simulation/KeyboardControls';
 import { Dashboard } from '@/components/ui/Dashboard';
+import { HomeScreen } from '@/components/ui/HomeScreen';
+import { PauseMenu } from '@/components/ui/PauseMenu';
+import { FeedbackScreen } from '@/components/ui/FeedbackScreen';
 import dynamic from 'next/dynamic';
 import { Suspense, Component, ReactNode } from 'react';
 
@@ -35,43 +38,6 @@ class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean,
 
     return this.props.children;
   }
-}
-
-function LessonSelector() {
-    const setLesson = useDrivingStore(state => state.setLesson);
-    const currentLesson = useDrivingStore(state => state.currentLesson);
-    
-    return (
-        <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 60, display: 'flex', gap: '10px' }}>
-            {(['straight', 'left-turn', 'right-turn'] as const).map((lesson) => {
-                const labels: Record<string, string> = {
-                    'straight': '直線',
-                    'left-turn': '左折',
-                    'right-turn': '右折',
-                    's-curve': 'S字',
-                    'crank': 'クランク'
-                };
-                return (
-                <button 
-                    key={lesson}
-                    onClick={() => setLesson(lesson as any)}
-                    style={{
-                        padding: '8px 16px',
-                        backgroundColor: currentLesson === lesson ? 'white' : 'rgba(0,0,0,0.5)',
-                        color: currentLesson === lesson ? 'black' : 'white',
-                        border: '1px solid white',
-                        borderRadius: '20px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                    }}
-                >
-                    {labels[lesson] || lesson}
-                </button>
-                );
-            })}
-        </div>
-    );
 }
 
 // Mission Definitions
@@ -140,37 +106,59 @@ function MissionOverlay() {
     );
 }
 
-
-
 export default function ClientApp() {
+  const screen = useDrivingStore(state => state.screen);
+  const isPaused = useDrivingStore(state => state.isPaused);
+  const setPaused = useDrivingStore(state => state.setPaused);
+
   return (
     <ErrorBoundary>
         <div style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden' }}>
-          <MissionOverlay />
-          <LessonSelector />
-          <VisionController />
-          <KeyboardControls />
-          <Dashboard />
           
-          <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              zIndex: 10,
-              padding: '16px',
-              color: 'white',
-              pointerEvents: 'none',
-              userSelect: 'none'
-          }}>
-            <h1 style={{ fontSize: '24px', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>バーチャル教習所</h1>
-            <p style={{ fontSize: '14px', opacity: 0.8, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>カメラを起動中... 手を上げてハンドル操作、W/Sキーでアクセル/ブレーキ</p>
-          </div>
+          {/* Global Pause Menu Handler */}
+          <PauseMenu />
+          
+          {screen === 'home' && <HomeScreen />}
 
-          <div style={{ width: '100%', height: '100%', zIndex: 0 }}>
-             <Suspense fallback={<div style={{ color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>Loading 3D Scene...</div>}>
-                <Scene />
-             </Suspense>
-          </div>
+          {screen === 'driving' && (
+              <>
+                <VisionController />
+                <MissionOverlay />
+                <KeyboardControls />
+                <Dashboard />
+
+                
+                {/* Pause Button (Visible during driving) */}
+                <button 
+                    onClick={() => setPaused(true)}
+                    className="absolute top-4 right-4 z-50 p-2 bg-slate-800/80 rounded hover:bg-slate-700 text-white font-bold border border-slate-600"
+                >
+                    ⏸ Pause
+                </button>
+
+                <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    zIndex: 10,
+                    padding: '16px',
+                    color: 'white',
+                    pointerEvents: 'none',
+                    userSelect: 'none'
+                }}>
+                    <h1 style={{ fontSize: '24px', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>バーチャル教習所</h1>
+                    <p style={{ fontSize: '14px', opacity: 0.8, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>カメラを起動中... 手を上げてハンドル操作、W/Sキーでアクセル/ブレーキ</p>
+                </div>
+
+                <div style={{ width: '100%', height: '100%', zIndex: 0 }}>
+                    <Suspense fallback={<div style={{ color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>Loading 3D Scene...</div>}>
+                        <Scene />
+                    </Suspense>
+                </div>
+              </>
+          )}
+
+          {screen === 'feedback' && <FeedbackScreen />}
         </div>
     </ErrorBoundary>
   );
