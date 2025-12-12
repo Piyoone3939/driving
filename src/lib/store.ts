@@ -40,7 +40,7 @@ interface DrivingState {
 
   // Actions
   setScreen: (screen: 'home' | 'driving' | 'feedback') => void;
-  setPaused: (paused: boolean) => void;
+  setIsPaused: (paused: boolean) => void;
   
   setSteering: (val: number) => void;
   setPedals: (throttle: number, brake: number) => void;
@@ -85,7 +85,7 @@ export const useDrivingStore = create<DrivingState>((set) => ({
   debugInfo: 'Initializing...',
 
   setScreen: (screen) => set({ screen }),
-  setPaused: (paused) => set({ isPaused: paused }),
+  setIsPaused: (paused) => set({ isPaused: paused }),
 
   setSteering: (val) => set({ steeringAngle: val }),
   setPedals: (throttle, brake) => set({ throttle, brake }),

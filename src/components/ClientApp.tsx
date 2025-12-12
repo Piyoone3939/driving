@@ -4,8 +4,8 @@ import { useDrivingStore } from '@/lib/store';
 import KeyboardControls from '@/components/simulation/KeyboardControls';
 import { Dashboard } from '@/components/ui/Dashboard';
 import { HomeScreen } from '@/components/ui/HomeScreen';
-import { PauseMenu } from '@/components/ui/PauseMenu';
 import { FeedbackScreen } from '@/components/ui/FeedbackScreen';
+import { LessonSelector } from '@/components/ui/LessonSelector';
 import dynamic from 'next/dynamic';
 import { Suspense, Component, ReactNode } from 'react';
 
@@ -109,7 +109,7 @@ function MissionOverlay() {
 export default function ClientApp() {
   const screen = useDrivingStore(state => state.screen);
   const isPaused = useDrivingStore(state => state.isPaused);
-  const setPaused = useDrivingStore(state => state.setPaused);
+  const setIsPaused = useDrivingStore(state => state.setIsPaused);
 
   // クリックした時の動作（ボタンの上でクリックした時は反応しないようにする工夫付き）
   const handleGlobalClick = (e: React.MouseEvent) => {
@@ -117,22 +117,41 @@ export default function ClientApp() {
     if ((e.target as HTMLElement).closest('button')) {
       return;
     }
-    setPaused(true);
+    setIsPaused(!isPaused);
   };
 
   return (
     <ErrorBoundary>
-        <div style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden', cursor: 'pointer' }} onClick={handleGlobalClick}>
+        <div 
+            style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden', cursor: 'pointer' }} 
+            onClick={handleGlobalClick}
+        >
           
-          {/* Global Pause Menu Handler */}
-          <PauseMenu />
+          {/* Pause Overlay */}
+          {isPaused && (
+            <div style={{
+              position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+              backgroundColor: 'rgba(0, 0, 0, 0.6)', 
+              zIndex: 999, 
+              display: 'flex', justifyContent: 'center', alignItems: 'center',
+              pointerEvents: 'none', 
+            }}>
+              <h1 style={{ 
+                color: 'white', fontSize: '80px', fontWeight: 'bold', letterSpacing: '10px',
+                textShadow: '0 0 20px rgba(255,255,255,0.5)'
+              }}>
+                PAUSED ⏸
+              </h1>
+            </div>
+          )}
           
           {screen === 'home' && <HomeScreen />}
 
           {screen === 'driving' && (
               <>
-                <VisionController />
+                <VisionController isPaused={isPaused} />
                 <MissionOverlay />
+                <LessonSelector />
                 <KeyboardControls />
                 <Dashboard />
 

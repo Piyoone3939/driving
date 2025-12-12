@@ -54,8 +54,14 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
     const coursePath = useMemo(() => getCoursePath(currentLesson), [currentLesson]);
     const courseLength = useMemo(() => coursePath.getLength(), [coursePath]);
 
+
+
     useFrame((state, delta) => {
-        if (!groupRef.current || isPaused) return;
+        if (!groupRef.current) return;
+
+        if(isPaused){
+            return;
+        }
 
         // --- REPLAY MODE ---
         if (isReplaying) {
