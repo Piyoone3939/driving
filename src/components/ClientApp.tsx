@@ -156,7 +156,7 @@ export default function ClientApp() {
   return (
     <ErrorBoundary>
         <div onClick={handleGlobalClick} // ここにクリックイベントを仕込む
-        style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden',cursor: 'pointer' // クリックできることをマウスカーソルで教える
+        style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden',cursor: 'pointer' // クリックできることをマウスカーソルの表示で教える
             }}>
             {/* 停止中に表示する「PAUSED」の膜 */}
           {isPaused && (
@@ -165,7 +165,7 @@ export default function ClientApp() {
               backgroundColor: 'rgba(0, 0, 0, 0.6)', // 画面を少し暗くする
               zIndex: 999, // 最前面に表示
               display: 'flex', justifyContent: 'center', alignItems: 'center',
-              pointerEvents: 'none', // 文字がクリックを邪魔しないように
+              pointerEvents: 'none', // Pausedを押してもPauseが解除される
             }}>
               <h1 style={{ 
                 color: 'white', fontSize: '80px', fontWeight: 'bold', letterSpacing: '10px',
@@ -177,7 +177,7 @@ export default function ClientApp() {
           )}
           <MissionOverlay />
           <LessonSelector />
-          <VisionController />
+          <VisionController isPaused={isPaused} />
           <KeyboardControls />
           <Dashboard />
           

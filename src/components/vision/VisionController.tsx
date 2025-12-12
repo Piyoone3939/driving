@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { FilesetResolver, FaceLandmarker, HandLandmarker, DrawingUtils, FaceLandmarkerResult, HandLandmarkerResult } from "@mediapipe/tasks-vision";
 import { useDrivingStore } from "@/lib/store";
 
-export default function VisionController() {
+export default function VisionController({ isPaused }: { isPaused: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [webcamRunning, setWebcamRunning] = useState(false);
@@ -20,6 +20,19 @@ export default function VisionController() {
   const handLandmarkerRef = useRef<HandLandmarker | null>(null);
   const lastVideoTimeRef = useRef<number>(-1);
   const requestRef = useRef<number>(0);
+
+  // ▼▼▼ 最新の停止状態を常に監視するためのRef ▼▼▼
+  // (ループ処理は高速なので、StateではなくRefで最新の値を見に行くのが定石です)
+  const isPausedRef = useRef(isPaused);
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+
+    if(isPaused){
+      setSteering(0);
+      setHeadRotation({pitch:0, yaw:0, roll:0});
+      setDebugInfo("Paused ^ Controls Reset");
+    }
+  }, [isPaused, setSteering, setHeadRotation, setDebugInfo]);
 
   useEffect(() => {
     async function setupMediaPipe() {
@@ -99,6 +112,13 @@ export default function VisionController() {
 
   const predictWebcam = () => {
     if (!videoRef.current || !canvasRef.current) return; // Check canvasRef too
+
+    // ▼▼▼ ここで検問！ 停止中なら何もしない ▼▼▼
+    if (isPausedRef.current) {
+        // 次のフレームの予約だけして、計算せずに帰る（待機状態）
+        requestRef.current = requestAnimationFrame(predictWebcam);
+        return; 
+    }
 
     const video = videoRef.current;
     
