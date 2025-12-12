@@ -3,6 +3,9 @@
 import { useDrivingStore } from '@/lib/store';
 import KeyboardControls from '@/components/simulation/KeyboardControls';
 import { Dashboard } from '@/components/ui/Dashboard';
+import { HomeScreen } from '@/components/ui/HomeScreen';
+import { FeedbackScreen } from '@/components/ui/FeedbackScreen';
+import { LessonSelector } from '@/components/ui/LessonSelector';
 import dynamic from 'next/dynamic';
 import { Suspense, Component, ReactNode, useState } from 'react';
 
@@ -35,43 +38,6 @@ class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean,
 
     return this.props.children;
   }
-}
-
-function LessonSelector() {
-    const setLesson = useDrivingStore(state => state.setLesson);
-    const currentLesson = useDrivingStore(state => state.currentLesson);
-    
-    return (
-        <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 60, display: 'flex', gap: '10px' }}>
-            {(['straight', 'left-turn', 'right-turn'] as const).map((lesson) => {
-                const labels: Record<string, string> = {
-                    'straight': '直線',
-                    'left-turn': '左折',
-                    'right-turn': '右折',
-                    's-curve': 'S字',
-                    'crank': 'クランク'
-                };
-                return (
-                <button 
-                    key={lesson}
-                    onClick={() => setLesson(lesson as any)}
-                    style={{
-                        padding: '8px 16px',
-                        backgroundColor: currentLesson === lesson ? 'white' : 'rgba(0,0,0,0.5)',
-                        color: currentLesson === lesson ? 'black' : 'white',
-                        border: '1px solid white',
-                        borderRadius: '20px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                    }}
-                >
-                    {labels[lesson] || lesson}
-                </button>
-                );
-            })}
-        </div>
-    );
 }
 
 // Mission Definitions
@@ -140,12 +106,10 @@ function MissionOverlay() {
     );
 }
 
-
-
 export default function ClientApp() {
-    // const [isPaused, setIsPaused] = useState(false);
-    const isPaused = useDrivingStore(state => state.isPaused);
-    const setIsPaused = useDrivingStore(state => state.setIsPaused);
+  const screen = useDrivingStore(state => state.screen);
+  const isPaused = useDrivingStore(state => state.isPaused);
+  const setIsPaused = useDrivingStore(state => state.setIsPaused);
 
   // クリックした時の動作（ボタンの上でクリックした時は反応しないようにする工夫付き）
   const handleGlobalClick = (e: React.MouseEvent) => {
@@ -155,19 +119,22 @@ export default function ClientApp() {
     }
     setIsPaused(!isPaused);
   };
+
   return (
     <ErrorBoundary>
-        <div onClick={handleGlobalClick} // ここにクリックイベントを仕込む
-        style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden',cursor: 'pointer' // クリックできることをマウスカーソルの表示で教える
-            }}>
-            {/* 停止中に表示する「PAUSED」の膜 */}
+        <div 
+            style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden', cursor: 'pointer' }} 
+            onClick={handleGlobalClick}
+        >
+          
+          {/* Pause Overlay */}
           {isPaused && (
             <div style={{
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-              backgroundColor: 'rgba(0, 0, 0, 0.6)', // 画面を少し暗くする
-              zIndex: 999, // 最前面に表示
+              backgroundColor: 'rgba(0, 0, 0, 0.6)', 
+              zIndex: 999, 
               display: 'flex', justifyContent: 'center', alignItems: 'center',
-              pointerEvents: 'none', // Pausedを押してもPauseが解除される
+              pointerEvents: 'none', 
             }}>
               <h1 style={{ 
                 color: 'white', fontSize: '80px', fontWeight: 'bold', letterSpacing: '10px',
@@ -177,32 +144,41 @@ export default function ClientApp() {
               </h1>
             </div>
           )}
-          <MissionOverlay />
-          <LessonSelector />
-          <VisionController isPaused={isPaused} />
-          <KeyboardControls />
-          <Dashboard />
           
-          <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              zIndex: 10,
-              padding: '16px',
-              color: 'white',
-              pointerEvents: 'none',
-              userSelect: 'none'
-          }}>
-            <h1 style={{ fontSize: '24px', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>バーチャル教習所</h1>
-            <p style={{ fontSize: '14px', opacity: 0.8, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>画面クリックで一時停止 / 再開<br/>
-               カメラを起動中... 手を上げてハンドル操作</p>
-          </div>
+          {screen === 'home' && <HomeScreen />}
 
-          <div style={{ width: '100%', height: '100%', zIndex: 0 }}>
-             <Suspense fallback={<div style={{ color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>Loading 3D Scene...</div>}>
-                <Scene />
-             </Suspense>
-          </div>
+          {screen === 'driving' && (
+              <>
+                <VisionController isPaused={isPaused} />
+                <MissionOverlay />
+                <LessonSelector />
+                <KeyboardControls />
+                <Dashboard />
+
+                <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    zIndex: 10,
+                    padding: '16px',
+                    color: 'white',
+                    pointerEvents: 'none',
+                    userSelect: 'none'
+                }}>
+                    <h1 style={{ fontSize: '24px', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>バーチャル教習所</h1>
+                    <p style={{ fontSize: '14px', opacity: 0.8, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>画面クリックで一時停止 / 再開<br/>
+                       カメラを起動中... 手を上げてハンドル操作、W/Sキーでアクセル/ブレーキ</p>
+                </div>
+
+                <div style={{ width: '100%', height: '100%', zIndex: 0 }}>
+                    <Suspense fallback={<div style={{ color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>Loading 3D Scene...</div>}>
+                        <Scene />
+                    </Suspense>
+                </div>
+              </>
+          )}
+
+          {screen === 'feedback' && <FeedbackScreen />}
         </div>
     </ErrorBoundary>
   );

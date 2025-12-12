@@ -1,12 +1,15 @@
+
 "use client";
 
 import { useDrivingStore } from "@/lib/store";
 
 export function Dashboard() {
   const speed = useDrivingStore(state => state.speed);
+  const gear = useDrivingStore(state => state.gear);
   const steering = useDrivingStore(state => state.steeringAngle); // -1 to 1
   const throttle = useDrivingStore(state => state.throttle);
   const brake = useDrivingStore(state => state.brake);
+  const feedback = useDrivingStore(state => state.drivingFeedback);
   const isOffTrack = useDrivingStore(state => state.isOffTrack);
 
   // Speedometer Arc Calculation
