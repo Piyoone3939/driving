@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { FilesetResolver, FaceLandmarker, HandLandmarker, DrawingUtils, FaceLandmarkerResult, HandLandmarkerResult } from "@mediapipe/tasks-vision";
 import { useDrivingStore } from "@/lib/store";
 
-export default function VisionController() {
+export default function VisionController({ isPaused }: { isPaused: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [webcamRunning, setWebcamRunning] = useState(false);
@@ -14,12 +14,27 @@ export default function VisionController() {
   const setSteering = useDrivingStore((state) => state.setSteering);
   const setVisionReady = useDrivingStore((state) => state.setVisionReady);
   const setDebugInfo = useDrivingStore((state) => state.setDebugInfo);
+  const setPedals = useDrivingStore((state) => state.setPedals);
+  const setSpeed = useDrivingStore((state => state.setSpeed));
 
   // References for MediaPipe instances
   const faceLandmarkerRef = useRef<FaceLandmarker | null>(null);
   const handLandmarkerRef = useRef<HandLandmarker | null>(null);
   const lastVideoTimeRef = useRef<number>(-1);
   const requestRef = useRef<number>(0);
+
+  // ▼▼▼ 最新の停止状態を常に監視するためのRef ▼▼▼
+  // (ループ処理は高速なので、StateではなくRefで最新の値を見に行くのが定石です)
+  const isPausedRef = useRef(isPaused);
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+
+    if(isPaused){
+      setSteering(0);
+      setSpeed(0);
+      setDebugInfo("Paused");
+    }
+  }, [isPaused, setSteering, setSpeed, setDebugInfo]);
 
   useEffect(() => {
     async function setupMediaPipe() {
@@ -99,6 +114,13 @@ export default function VisionController() {
 
   const predictWebcam = () => {
     if (!videoRef.current || !canvasRef.current) return; // Check canvasRef too
+
+    // ここで検問！ 停止中なら何もしない
+    if (isPausedRef.current) {
+        // 次のフレームの予約だけして、計算せずに帰る（待機状態）
+        requestRef.current = requestAnimationFrame(predictWebcam);
+        return; 
+    }
 
     const video = videoRef.current;
     
@@ -256,14 +278,42 @@ export default function VisionController() {
         opacity: 0.8,
     }}>
         <video ref={videoRef} style={{ display: 'none' }} autoPlay playsInline muted></video>
+        <div style={{
+          position: "relative",
+          width: "240px",
+          height: "180px"
+        }}>
         <canvas ref={canvasRef} style={{
-            width: '240px',
-            height: '180px',
+            width: '100%',
+            height: '100%',
             backgroundColor: 'black',
             borderRadius: '10px',
             border: '1px solid #333',
             transform: 'scaleX(-1)'
         }} />
+        {isPaused && (
+          <div style={{
+            position: "absolute",
+            top:0,
+            left:0,
+            width: "100%",
+            height:"100%",
+            backgroundColor: "rgba(0,0,0,0.7)",
+            borderRadius: "10px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10,
+          }}>
+            <span style={{
+              color: "white",
+              fontFamily: "monospace",
+              fontSize: "16px",
+              fontWeight: "bold",
+            }}>PAUSED</span>
+            </div>
+        )}
+        </div>
         <div style={{
             backgroundColor: 'rgba(0,0,0,0.8)',
             color: 'white',
