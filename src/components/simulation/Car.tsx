@@ -1,42 +1,40 @@
 "use client";
 
 import { useFrame, useThree } from "@react-three/fiber";
-import { useRef, useEffect, useMemo } from "react";
-import { Vector3, Group, Euler } from "three";
-import { useDrivingStore, ReplayFrame } from "@/lib/store";
-import { checkMissionGoal, MISSION_CHECKPOINTS } from "@/components/simulation/MissionController";
-import { getCoursePath } from "@/lib/course";
+import { useRef, useState, useEffect } from "react";
+import { Vector3, Group, Quaternion } from "three";
+import { useDrivingStore } from "@/lib/store";
 
-export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'ghost' }) {
-    const groupRef = useRef<Group>(null);
-    const ghostRef = useRef<Group>(null); // Ref for Ghost Car
-    const { camera } = useThree();
+export function Car() {
+  const groupRef = useRef<Group>(null);
+  const { camera } = useThree();
+  
+  // State from store
+  const steeringInput = useDrivingStore(state => state.steeringAngle);
+  const throttleInput = useDrivingStore(state => state.throttle);
+  const brakeInput = useDrivingStore(state => state.brake);
+  const headRotation = useDrivingStore(state => state.headRotation);
+  const setSpeed = useDrivingStore(state => state.setSpeed);
+  const isPaused = useDrivingStore(state => state.isPaused);
 
-    const { 
-        steeringAngle: steeringInput, 
-        throttle: throttleInput, 
-        brake: brakeInput, 
-        headRotation, 
-        setSpeed,
-        isPaused,
-        isReplaying,
-        replayData,
-        replayViewMode,
-        currentLesson,
-        setMissionState,
-        setScreen
-    } = useDrivingStore();
+  // Physics state
+  const speed = useRef(0);
+  const maxSpeed = 1.5; // units per frame approx
+  const acceleration = 0.01;
+  const friction = 0.005;
+  const turnSpeed = 0.05; // More sensitive steering
 
-    // Physics state
-    const speed = useRef(0);
-    const maxSpeed = 1.5; 
-    const acceleration = 0.01;
-    const friction = 0.005;
-    const turnSpeed = 0.05; 
-    const creepSpeed = 0.05;
+  const creepSpeed = 0.05; // Automatic creep faster
 
-    // Recording state
-    const recordedFrames = useRef<ReplayFrame[]>([]);
+  useFrame((state, delta) => {
+    if (!groupRef.current) return;
+
+    if(isPaused){
+        return;
+    }
+
+    // 1. Calculate Speed
+    let targetSpeed = 0;
     
     // Replay state
     const replayIndex = useRef(0);

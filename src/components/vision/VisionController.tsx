@@ -125,6 +125,35 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         };
       }, [webcamRunning]);
     
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480 }
+      });
+      videoRef.current.srcObject = stream;
+      try {
+          await videoRef.current.play(); // Explicit play
+      } catch (e) {
+          console.warn("Video play interrupted or failed:", e);
+      }
+      videoRef.current.addEventListener("loadeddata", predictWebcam);
+      setWebcamRunning(true);
+    } catch (err) {
+      console.error(err);
+      setDebugInfo("Camera Error: " + String(err));
+    }
+  };
+
+  const predictWebcam = () => {
+    if (!videoRef.current || !canvasRef.current) return; // Check canvasRef too
+
+    // ここで検問！ 停止中なら何もしない
+    if (isPausedRef.current) {
+        // 次のフレームの予約だけして、計算せずに帰る（待機状態）
+        requestRef.current = requestAnimationFrame(predictWebcam);
+        return; 
+    }
+
+    const video = videoRef.current;
     
       const predictWebcam = () => {
         if (!videoRef.current || !canvasRef.current) return;
@@ -300,23 +329,43 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         alignItems: 'flex-end',
         opacity: 0.8,
     }}>
-        <video ref={videoRef} style={{ position: 'absolute', opacity: 0, zIndex: -1 }} autoPlay playsInline muted></video>
-        
+        <video ref={videoRef} style={{ display: 'none' }} autoPlay playsInline muted></video>
         <div style={{
           position: "relative",
           width: "240px",
           height: "180px"
         }}>
-            <canvas ref={canvasRef} style={{
-                width: '100%',
-                height: '100%',
-                backgroundColor: 'black',
-                borderRadius: '10px',
-                border: '1px solid #333',
-                transform: 'scaleX(-1)'
-            }} />
+        <canvas ref={canvasRef} style={{
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'black',
+            borderRadius: '10px',
+            border: '1px solid #333',
+            transform: 'scaleX(-1)'
+        }} />
+        {isPaused && (
+          <div style={{
+            position: "absolute",
+            top:0,
+            left:0,
+            width: "100%",
+            height:"100%",
+            backgroundColor: "rgba(0,0,0,0.7)",
+            borderRadius: "10px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10,
+          }}>
+            <span style={{
+              color: "white",
+              fontFamily: "monospace",
+              fontSize: "16px",
+              fontWeight: "bold",
+            }}>PAUSED</span>
+            </div>
+        )}
         </div>
-
         <div style={{
             backgroundColor: 'rgba(0,0,0,0.8)',
             color: 'white',

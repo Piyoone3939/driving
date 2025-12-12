@@ -7,7 +7,7 @@ import { HomeScreen } from '@/components/ui/HomeScreen';
 import { FeedbackScreen } from '@/components/ui/FeedbackScreen';
 import { LessonSelector } from '@/components/ui/LessonSelector';
 import dynamic from 'next/dynamic';
-import { Suspense, Component, ReactNode } from 'react';
+import { Suspense, Component, ReactNode, useState } from 'react';
 
 const VisionController = dynamic(() => import('@/components/vision/VisionController'), { ssr: false });
 const Scene = dynamic(() => import('@/components/simulation/Scene').then(mod => mod.Scene), { ssr: false });
