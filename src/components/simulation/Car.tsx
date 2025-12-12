@@ -15,6 +15,7 @@ export function Car() {
   const brakeInput = useDrivingStore(state => state.brake);
   const headRotation = useDrivingStore(state => state.headRotation);
   const setSpeed = useDrivingStore(state => state.setSpeed);
+  const isPaused = useDrivingStore(state => state.isPaused);
 
   // Physics state
   const speed = useRef(0);
@@ -27,6 +28,10 @@ export function Car() {
 
   useFrame((state, delta) => {
     if (!groupRef.current) return;
+
+    if(isPaused){
+        return;
+    }
 
     // 1. Calculate Speed
     let targetSpeed = 0;

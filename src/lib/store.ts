@@ -15,6 +15,7 @@ interface DrivingState {
   currentLesson: 'straight' | 's-curve' | 'crank' | 'left-turn' | 'right-turn';
   missionState: 'idle' | 'briefing' | 'active'; // Logic for screen transitions
   isOffTrack: boolean;
+  isPaused: boolean;
 
   // System
   isVisionReady: boolean;
@@ -30,6 +31,7 @@ interface DrivingState {
   setHeadRotation: (rotation: { pitch: number; yaw: number; roll: number }) => void;
   setVisionReady: (ready: boolean) => void;
   setDebugInfo: (info: string) => void;
+  setIsPaused: (paused: boolean) => void;
 }
 
 export const useDrivingStore = create<DrivingState>((set) => ({
@@ -43,6 +45,7 @@ export const useDrivingStore = create<DrivingState>((set) => ({
   currentLesson: 'straight',
   missionState: 'briefing', // Start with briefing
   isOffTrack: false,
+  isPaused: false,
 
   isVisionReady: false,
   debugInfo: 'Initializing...',
@@ -56,4 +59,5 @@ export const useDrivingStore = create<DrivingState>((set) => ({
   setHeadRotation: (rotation) => set({ headRotation: rotation }),
   setVisionReady: (ready) => set({ isVisionReady: ready }),
   setDebugInfo: (info) => set({ debugInfo: info }),
+  setIsPaused: (paused) => set({isPaused: paused})
 }));

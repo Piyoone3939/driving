@@ -143,7 +143,9 @@ function MissionOverlay() {
 
 
 export default function ClientApp() {
-    const [isPaused, setIsPaused] = useState(false);
+    // const [isPaused, setIsPaused] = useState(false);
+    const isPaused = useDrivingStore(state => state.isPaused);
+    const setIsPaused = useDrivingStore(state => state.setIsPaused);
 
   // クリックした時の動作（ボタンの上でクリックした時は反応しないようにする工夫付き）
   const handleGlobalClick = (e: React.MouseEvent) => {
