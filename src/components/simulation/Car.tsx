@@ -1,40 +1,42 @@
 "use client";
 
 import { useFrame, useThree } from "@react-three/fiber";
-import { useRef, useState, useEffect } from "react";
-import { Vector3, Group, Quaternion } from "three";
-import { useDrivingStore } from "@/lib/store";
+import { useRef, useEffect, useMemo } from "react";
+import { Vector3, Group, Euler } from "three";
+import { useDrivingStore, ReplayFrame } from "@/lib/store";
+import { checkMissionGoal, MISSION_CHECKPOINTS } from "@/components/simulation/MissionController";
+import { getCoursePath } from "@/lib/course";
 
-export function Car() {
-  const groupRef = useRef<Group>(null);
-  const { camera } = useThree();
-  
-  // State from store
-  const steeringInput = useDrivingStore(state => state.steeringAngle);
-  const throttleInput = useDrivingStore(state => state.throttle);
-  const brakeInput = useDrivingStore(state => state.brake);
-  const headRotation = useDrivingStore(state => state.headRotation);
-  const setSpeed = useDrivingStore(state => state.setSpeed);
-  const isPaused = useDrivingStore(state => state.isPaused);
+export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'ghost' }) {
+    const groupRef = useRef<Group>(null);
+    const ghostRef = useRef<Group>(null); // Ref for Ghost Car
+    const { camera } = useThree();
 
-  // Physics state
-  const speed = useRef(0);
-  const maxSpeed = 1.5; // units per frame approx
-  const acceleration = 0.01;
-  const friction = 0.005;
-  const turnSpeed = 0.05; // More sensitive steering
+    const { 
+        steeringAngle: steeringInput, 
+        throttle: throttleInput, 
+        brake: brakeInput, 
+        headRotation, 
+        setSpeed,
+        isPaused,
+        isReplaying,
+        replayData,
+        replayViewMode,
+        currentLesson,
+        setMissionState,
+        setScreen
+    } = useDrivingStore();
 
-  const creepSpeed = 0.05; // Automatic creep faster
+    // Physics state
+    const speed = useRef(0);
+    const maxSpeed = 1.5; 
+    const acceleration = 0.01;
+    const friction = 0.005;
+    const turnSpeed = 0.05; 
+    const creepSpeed = 0.05;
 
-  useFrame((state, delta) => {
-    if (!groupRef.current) return;
-
-    if(isPaused){
-        return;
-    }
-
-    // 1. Calculate Speed
-    let targetSpeed = 0;
+    // Recording state
+    const recordedFrames = useRef<ReplayFrame[]>([]);
     
     // Replay state
     const replayIndex = useRef(0);
@@ -51,8 +53,6 @@ export function Car() {
     // Get Course Path for Ghost Car
     const coursePath = useMemo(() => getCoursePath(currentLesson), [currentLesson]);
     const courseLength = useMemo(() => coursePath.getLength(), [coursePath]);
-
-
 
     useFrame((state, delta) => {
         if (!groupRef.current) return;
@@ -87,7 +87,6 @@ export function Car() {
                 }
 
                 // Camera Logic (Replay)
-                // Camera Logic (Replay)
                 if (replayViewMode === 'driver') {
                     // First Person (Driver View)
                     const targetGroup = cameraTarget === 'ghost' ? ghostRef.current : groupRef.current;
@@ -102,21 +101,14 @@ export function Car() {
                         let baseLookTarget;
 
                         if (cameraTarget === 'ghost') {
-                            // Ideal Look: Along the path tangent (already set in ghost rotation)
-                            // Ghost rotation is set to path tangent Y.
-                            // We can simulate "perfect driving" looking straight ahead (relative to car)
-                            // Or slightly into the turn? Let's just look straight ahead relative to car for "Ideal".
                             const forward = new Vector3(0, 0, -1);
                             forward.applyEuler(targetGroup.rotation);
                             baseLookTarget = targetGroup.position.clone().add(forward.multiplyScalar(10));
-                            // No head rotation for ghost (or could simulate looking into turn)
                         } else {
-                            // Player Look: Use recorded head rotation
+                            // Player Look
                             const recordedHead = frame.headRotation || { pitch: 0, yaw: 0, roll: 0 };
-                            
                             const forward = new Vector3(0, 0, -1);
                             forward.applyEuler(targetGroup.rotation);
-                            
                             baseLookTarget = targetGroup.position.clone().add(forward.multiplyScalar(10));
                             
                             const right = new Vector3(1, 0, 0).applyEuler(targetGroup.rotation);
@@ -128,10 +120,8 @@ export function Car() {
                     }
 
                 } else {
-                    // Third Person (Chase Cam) - Always follow player (for now)
-                    // Could support cameraTarget='ghost' here too if we wanted "Ghost Chase Cam"
-                    const targetGroup = groupRef.current; // Force player chase
-                    
+                    // Third Person (Chase Cam)
+                    const targetGroup = groupRef.current; 
                     const camOffset = new Vector3(0, 5, 10); 
                     camOffset.applyEuler(targetGroup.rotation); 
                     const camPos = targetGroup.position.clone().add(new Vector3(0, 4, 8).applyEuler(targetGroup.rotation));
@@ -185,44 +175,27 @@ export function Car() {
              return;
         }
 
-        // CHECK INTERMEDIATE CHECKPOINTS (Props)
-        const checkpoints = dataCheckpoints.current; // access ref 
+        // CHECK INTERMEDIATE CHECKPOINTS
+        const checkpoints = dataCheckpoints.current; 
         checkpoints.forEach(cp => {
-            if (clearedCheckpoints.current.has(cp.id)) return; // Already done
+            if (clearedCheckpoints.current.has(cp.id)) return; 
 
-            // Distance Check
             const dx = groupRef.current!.position.x - cp.position[0];
             const dz = groupRef.current!.position.z - cp.position[2];
             const dist = Math.sqrt(dx*dx + dz*dz);
 
             if (dist < cp.radius) {
-                // Inside Checkpoint Area
                 if (cp.type === 'stop') {
-                    // STOP Check
-                    // If speed is basically 0
                     if (Math.abs(speed.current) < 0.05) {
                         clearedCheckpoints.current.add(cp.id);
                         useDrivingStore.getState().setDrivingFeedback("🛑 一時停止 OK!");
                         setTimeout(() => useDrivingStore.getState().setDrivingFeedback(null), 2000);
-                    } else {
-                         // Show warning continuously? No, too annoying.
-                         // Maybe show "止まれ" text?
                     }
                 } else if (cp.type === 'mirror') {
-                    // GAZE Check
-                    // Expected Yaw: - means Right (screen coords), + means Left
-                    // My HeadRotation: Yaw is in radians. +Left, -Right usually? 
-                    // Let's check store definition: `steeringAngle` -1 (left) to 1 (right). 
-                    // HeadRotation comes from VisionController. 
-                    // Let's assume standard: Positive Left.
-                    
                     const needed = cp.targetYaw || 0;
                     const tolerance = cp.yawTolerance || 0.5;
                     const currentYaw = headRotation.yaw;
 
-                    // Directions: 
-                    // If needed is negative (Right), we want currentYaw < needed + tolerance && currentYaw > needed - tolerance?
-                    // Actually just Math.abs(current - needed) < tolerance
                     if (Math.abs(currentYaw - needed) < tolerance) {
                         clearedCheckpoints.current.add(cp.id);
                         const label = needed > 0 ? "左確認" : "右確認";
@@ -239,10 +212,10 @@ export function Car() {
             position: groupRef.current.position.toArray() as [number, number, number],
             rotation: groupRef.current.rotation.toArray() as [number, number, number],
             steering: steeringInput,
-            headRotation: { ...headRotation } // Save copy
+            headRotation: { ...headRotation } 
         });
 
-        // 5. Camera (First Person) - Positioned to see hood
+        // 5. Camera (First Person)
         const camOffset = new Vector3(0.35, 1.28, 0.4); 
         camOffset.applyEuler(groupRef.current.rotation);
         const camPos = groupRef.current.position.clone().add(camOffset);
@@ -259,48 +232,7 @@ export function Car() {
         camera.lookAt(baseLookTarget);
     });
 
-    // Helper boolean to decide visuals
-    // We show 'External' if: Replaying in Chase Mode OR Ghost
-    // We show 'Internal+Bonnet' if: Driving OR Replaying in Driver Mode
-    
-    // Actually, stick to the structure:
-    // Driving: External(hideCabin) + Internal
-    // Replay (Chase): External only
-    // Replay (Driver): External(hideCabin) + Internal  <-- Same as Driving!
-
     const showDriverView = !isReplaying || (isReplaying && replayViewMode === 'driver');
-    // steeringInput during replay needs to come from frame, BUT we are inside component.
-    // The CarVisuals component takes `steeringInput` prop.
-    // In Driving mode, it's `steeringInput` from store.
-    // In Replay mode, we need the `steering` from current frame.
-    // Ideally we'd trigger a re-render or pass a ref, but re-render 60fps is bad.
-    // `CarVisuals` is a simple component. Let's Pass the CURRENT steering value.
-    // We can use a ref for steering that updates in the loop?
-    // But React won't re-render unless state changes.
-    // Actually, let's keep it simple: `steeringInput` from store is live during driving.
-    // During replay, we are NOT updating the store's `steeringAngle`.
-    // So the Steering Wheel won't move in Replay unless we update the view.
-    // We can drive the Steering Wheel rotation via a Ref in `CarVisuals`?
-    // Let's modify `CarVisuals` to accept a Ref? Or update store dummy steering?
-    // Updating store at 60fps might be heavy but let's try it or just accept static wheel for now?
-    // No, user wants to verify operation. Wheel must move.
-    // Simplest: Update a mutable Ref that `CarVisuals` reads? 
-    // `CarVisuals` is functional.
-    // Let's pass the frame's steering if replaying.
-    // But `Car` function re-renders? No, `useFrame` is side-effect. Component doesn't re-render.
-    // So `currentFrameSteering` variable won't update the JSX props.
-    // We need `CarVisuals` to animate itself via useFrame or Ref.
-    
-    // For now, let's just make sure the View/Camera is correct. 
-    // Wheel animation in replay is a "nice to have". 
-    // (Actually, checking my previous code... `CarVisuals` uses `steeringInput` prop. It controls visual rotation... assuming re-render.)
-    // Wait, `steeringInput` is from `useDrivingStore()`. Does that subscription trigger re-render on change?
-    // Yes, Zustand usage `const { steeringAngle } ...` triggers re-render on change.
-    // So in driving mode, it works because `setSteering` is called.
-    // In Replay mode, `steeringAngle` in store is NOT changing.
-    // WE SHOULD UPDATE STORE STEERING in Replay loop for visual feedback?
-    // That would trigger re-renders 60fps which might be heavy but maybe okay for this app?
-    // Let's try updating store steering in replay loop too.
     
     return (
         <>
@@ -308,12 +240,10 @@ export function Car() {
             <group ref={groupRef} position={[0, 0, 0]}>
                 {showDriverView ? 
                     (
-                        // Driver View (Driving or Replay-Driver)
                          <group rotation={[0, Math.PI, 0]}>
                             <ExternalCarVisuals hideCabin />
                         </group>
                     ) : (
-                        // Chase View (Replay-Chase)
                         <group rotation={[0, Math.PI, 0]}>
                             <ExternalCarVisuals />
                         </group>
@@ -321,11 +251,6 @@ export function Car() {
                 }
                 
                 {showDriverView && (
-                   // Steering Wheel
-                   // Note: If in replay, this will show static wheel unless we pipe data.
-                   // As a quick hack, I'll assume current store steering is 0 or what it was.
-                   // To make it move, I'd need to setSteering(frame.steering) in the replay loop.
-                   // I will add that to the loop above.
                    <CarVisuals steeringInput={steeringInput} />
                 )}
             </group>
@@ -342,8 +267,6 @@ export function Car() {
     );
 }
 
-// ... (CarVisuals and ExternalCarVisuals unchanged, include them below for completeness) ...
-// Internal View (Driving)
 export function CarVisuals({ steeringInput }: { steeringInput: number }) {
     return (
         <group rotation={[0, Math.PI, 0]}> 
@@ -386,7 +309,6 @@ export function CarVisuals({ steeringInput }: { steeringInput: number }) {
     );
 }
 
-// External View (Replay / Garage)
 export function ExternalCarVisuals({ isGhost = false, hideCabin = false }: { isGhost?: boolean, hideCabin?: boolean }) {
   const bodyColor = isGhost ? "#60a5fa" : "#334155";
   const cabinColor = isGhost ? "#93c5fd" : "#1e293b";
