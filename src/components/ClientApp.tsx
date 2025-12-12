@@ -111,9 +111,18 @@ export default function ClientApp() {
   const isPaused = useDrivingStore(state => state.isPaused);
   const setPaused = useDrivingStore(state => state.setPaused);
 
+  // クリックした時の動作（ボタンの上でクリックした時は反応しないようにする工夫付き）
+  const handleGlobalClick = (e: React.MouseEvent) => {
+    // もしクリックした場所が「ボタン」なら、一時停止機能は発動させない（ボタンの邪魔をしないため）
+    if ((e.target as HTMLElement).closest('button')) {
+      return;
+    }
+    setPaused(true);
+  };
+
   return (
     <ErrorBoundary>
-        <div style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden' }}>
+        <div style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden', cursor: 'pointer' }} onClick={handleGlobalClick}>
           
           {/* Global Pause Menu Handler */}
           <PauseMenu />
@@ -127,15 +136,6 @@ export default function ClientApp() {
                 <KeyboardControls />
                 <Dashboard />
 
-                
-                {/* Pause Button (Visible during driving) */}
-                <button 
-                    onClick={() => setPaused(true)}
-                    className="absolute top-4 right-4 z-50 p-2 bg-slate-800/80 rounded hover:bg-slate-700 text-white font-bold border border-slate-600"
-                >
-                    ⏸ Pause
-                </button>
-
                 <div style={{
                     position: 'absolute',
                     top: 0,
@@ -147,7 +147,8 @@ export default function ClientApp() {
                     userSelect: 'none'
                 }}>
                     <h1 style={{ fontSize: '24px', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>バーチャル教習所</h1>
-                    <p style={{ fontSize: '14px', opacity: 0.8, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>カメラを起動中... 手を上げてハンドル操作、W/Sキーでアクセル/ブレーキ</p>
+                    <p style={{ fontSize: '14px', opacity: 0.8, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>画面クリックで一時停止 / 再開<br/>
+                       カメラを起動中... 手を上げてハンドル操作、W/Sキーでアクセル/ブレーキ</p>
                 </div>
 
                 <div style={{ width: '100%', height: '100%', zIndex: 0 }}>
