@@ -8,6 +8,7 @@ import { FeedbackScreen } from '@/components/ui/FeedbackScreen';
 import { LessonSelector } from '@/components/ui/LessonSelector';
 import dynamic from 'next/dynamic';
 import { Suspense, Component, ReactNode, useState } from 'react';
+import { useDrivingFeedback } from '@/hooks/useDrivingFeedback';
 
 const VisionController = dynamic(() => import('@/components/vision/VisionController'), { ssr: false });
 const Scene = dynamic(() => import('@/components/simulation/Scene').then(mod => mod.Scene), { ssr: false });
@@ -110,6 +111,9 @@ export default function ClientApp() {
   const screen = useDrivingStore(state => state.screen);
   const isPaused = useDrivingStore(state => state.isPaused);
   const setIsPaused = useDrivingStore(state => state.setIsPaused);
+
+  useDrivingFeedback(); // Activate Feedback Logic
+
 
   // クリックした時の動作（ボタンの上でクリックした時は反応しないようにする工夫付き）
   const handleGlobalClick = (e: React.MouseEvent) => {

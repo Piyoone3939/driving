@@ -175,6 +175,60 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
              return;
         }
 
+        // --- ROUTE DEVIATION CHECK (New) ---
+        // Find closest point on course path to car
+        // Optimization: We could use t from ghost car but that might be ahead/behind.
+        // Let's do a simple scan or geometric projection. For MVP, simple search.
+        const carPos = groupRef.current.position;
+        // Search resolution: 100 steps? Or just project?
+        // Basic: Loop points? No, too slow.
+        // CurvePath usually has .getPointAt(u).
+        // Let's rely on stored t? No.
+        // Let's find min distance by sampling. 
+        // Better: Project point on segment.
+        // Given we know the course structure (lines + curves), ideal is math.
+        // But getCoursePath returns a CurvePath.
+        // Fallback: check distance to ghost car? No, ghost car moves at constant speed.
+        // User might be slow but on track.
+        
+        // Let's calculate distance to "nearest point on path".
+        // Since we are in 3D lib, maybe THREE has something? No.
+        
+        // Approx: Iterate checkpoints? No.
+        // Let's sample the curve at 100 points and find min?
+        // Course length is ~50-200m. 
+        // 1m resolution = 200 checks. Feasible in useFrame? Maybe.
+        
+        let minDistance = 1000;
+        const resolution = 50; // Check 50 points along the path
+        for(let i=0; i<=resolution; i++) {
+            const point = coursePath.getPointAt(i/resolution);
+            const dist = new Vector3(point.x, point.y, point.z).distanceTo(carPos);
+            if(dist < minDistance) minDistance = dist;
+        }
+
+        // Thresholds
+        const WARNING_DIST = 2.0; // 2m deviation starts warning?
+        const PENALTY_DIST = 2.5; 
+        
+        const isNowOffTrack = minDistance > PENALTY_DIST;
+        
+        // Update State
+        if (isNowOffTrack !== useDrivingStore.getState().isOffTrack) {
+             useDrivingStore.getState().setOffTrack(isNowOffTrack);
+        }
+
+        // Apply Penalty
+        if (isNowOffTrack && Math.abs(speed.current) > 0.01) {
+            // Penalty proportional to deviation usage? Or fixed per frame?
+            // Let's do fixed per frame to simulate "time spent off track"
+            // 0.05 points per frame (60fps) -> 3 points per second off track.
+            // Plus bonus based on how far?
+            const penalty = 0.05 + (minDistance - PENALTY_DIST) * 0.01;
+            useDrivingStore.getState().addDeviationPenalty(penalty);
+        }
+
+
         // CHECK INTERMEDIATE CHECKPOINTS
         const checkpoints = dataCheckpoints.current; 
         checkpoints.forEach(cp => {

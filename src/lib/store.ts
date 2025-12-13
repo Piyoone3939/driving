@@ -54,11 +54,32 @@ interface DrivingState {
   setVisionReady: (ready: boolean) => void;
   setDebugInfo: (info: string) => void;
   
+  // Timer & Scoring
+  missionStartTime: number;
+  missionEndTime: number;
+  deviationPenalty: number;
+  addDeviationPenalty: (amount: number) => void;
+
   // Replay Actions
   setIsReplaying: (isReplaying: boolean) => void; 
   setReplayViewMode: (mode: 'chase' | 'driver') => void;
   addReplayFrame: (frame: ReplayFrame) => void; 
   clearReplayData: () => void; 
+
+  // Feedback & Gaze
+  gaze: { x: number; y: number };
+  feedbackLogs: FeedbackEvent[];
+  recordedVideo: string | null;
+  setGaze: (gaze: { x: number; y: number }) => void;
+  addFeedbackLog: (log: FeedbackEvent) => void;
+  clearFeedbackLogs: () => void;
+  setRecordedVideo: (url: string | null) => void;
+}
+
+export interface FeedbackEvent {
+  time: number;
+  type: 'KAIZEN' | 'GOOD';
+  message: string;
 }
 
 export const useDrivingStore = create<DrivingState>((set) => ({
@@ -91,7 +112,25 @@ export const useDrivingStore = create<DrivingState>((set) => ({
   setPedals: (throttle, brake) => set({ throttle, brake }),
   setSpeed: (speed) => set({ speed }),
   setLesson: (lesson) => set({ currentLesson: lesson, missionState: 'briefing' }), 
-  setMissionState: (state) => set({ missionState: state }),
+  // Timer & Scoring
+  missionStartTime: 0,
+  missionEndTime: 0,
+
+  setMissionState: (state) => set((s) => {
+      const now = Date.now();
+      let updates: Partial<DrivingState> = { missionState: state };
+      
+      if (state === 'active') {
+          updates.missionStartTime = now;
+          updates.missionEndTime = 0; // Reset end time
+      } else if (state === 'success' || state === 'failed') {
+          updates.missionEndTime = now;
+      }
+      return updates;
+  }),
+  
+  deviationPenalty: 0,
+  addDeviationPenalty: (amount) => set((s) => ({ deviationPenalty: s.deviationPenalty + amount })),
 
   setOffTrack: (isOff) => set({ isOffTrack: isOff }),
   setDrivingFeedback: (msg) => set({ drivingFeedback: msg }),
@@ -103,4 +142,13 @@ export const useDrivingStore = create<DrivingState>((set) => ({
   setReplayViewMode: (mode) => set({ replayViewMode: mode }),
   addReplayFrame: (frame) => set((state) => ({ replayData: [...state.replayData, frame] })),
   clearReplayData: () => set({ replayData: [] }),
+
+  // Feedback & Gaze
+  gaze: { x: 0, y: 0 },
+  feedbackLogs: [],
+  recordedVideo: null,
+  setGaze: (gaze) => set({ gaze }),
+  addFeedbackLog: (log) => set((state) => ({ feedbackLogs: [...state.feedbackLogs, log] })),
+  clearFeedbackLogs: () => set({ feedbackLogs: [] }),
+  setRecordedVideo: (url) => set({ recordedVideo: url }),
 }));
