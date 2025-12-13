@@ -121,18 +121,18 @@ export default function ClientApp() {
     if ((e.target as HTMLElement).closest('button')) {
       return;
     }
-    setIsPaused(!isPaused);
+    if (screen === 'driving'){setIsPaused(!isPaused);}
   };
 
   return (
     <ErrorBoundary>
         <div 
-            style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden', cursor: 'pointer' }} 
+            style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden', cursor: screen === 'driving' ? 'pointer' : 'default' }} 
             onClick={handleGlobalClick}
         >
           
           {/* Pause Overlay */}
-          {isPaused && (
+          {screen === 'driving' && isPaused && (
             <div style={{
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
               backgroundColor: 'rgba(0, 0, 0, 0.6)', 
