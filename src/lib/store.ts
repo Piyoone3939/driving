@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export interface ReplayFrame {
+interface ReplayFrame {
   timestamp: number;
   position: [number, number, number];
   rotation: [number, number, number]; // Euler angles
@@ -8,7 +8,7 @@ export interface ReplayFrame {
   headRotation: { pitch: number; yaw: number; roll: number };
 }
 
-interface DrivingState {
+export interface DrivingState {
   // Screen Management
   screen: 'home' | 'driving' | 'feedback';
   isPaused: boolean;
