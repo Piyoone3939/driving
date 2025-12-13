@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { FilesetResolver, FaceLandmarker, HandLandmarker, PoseLandmarker, DrawingUtils, HandLandmarkerResult, PoseLandmarkerResult } from "@mediapipe/tasks-vision";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { FilesetResolver, FaceLandmarker, HandLandmarker, DrawingUtils, FaceLandmarkerResult, HandLandmarkerResult, PoseLandmarker, PoseLandmarkerResult } from "@mediapipe/tasks-vision";
 import { useDrivingStore } from "@/lib/store";
 import { calibrateFootPosition, processPedalRecognition, checkFootStability } from "@/lib/footPedalRecognition";
 import { PoseLandmarkFilterManager } from "@/lib/oneEuroFilter";
@@ -9,7 +9,6 @@ import { PoseLandmarkFilterManager } from "@/lib/oneEuroFilter";
 export default function VisionController({ isPaused }: { isPaused: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [webcamRunning, setWebcamRunning] = useState(false);
   
   // Store actions
   const setHeadRotation = useDrivingStore((state) => state.setHeadRotation);
@@ -22,8 +21,11 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
   const updatePedalState = useDrivingStore((state) => state.updatePedalState);
   const setCalibrationStage = useDrivingStore((state) => state.setCalibrationStage);
   const setScreen = useDrivingStore((state) => state.setScreen);
+  const setGaze = useDrivingStore((state) => state.setGaze); // Gaze action
+  const [webcamRunning, setWebcamRunning] = useState(false);
 
-  // References for MediaPipe instances
+
+  // References
   const faceLandmarkerRef = useRef<FaceLandmarker | null>(null);
   const handLandmarkerRef = useRef<HandLandmarker | null>(null);
   const poseLandmarkerRef = useRef<PoseLandmarker | null>(null);
@@ -35,6 +37,7 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
   const poseFilterManagerRef = useRef<PoseLandmarkFilterManager>(
     new PoseLandmarkFilterManager(1.0, 0.007, 1.0)
   );
+  const streamRef = useRef<MediaStream | null>(null); // ストリーム管理用
 
   const isPausedRef = useRef(isPaused);
   useEffect(() => {
@@ -47,15 +50,72 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
     }
   }, [isPaused, setSteering, setSpeed, setDebugInfo]);
 
+  // ■ カメラを停止する関数（物理的に切断）
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        track.stop(); // これがカメラのライトを消すコマンドだ
+      });
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    // ループを止める
+    if (requestRef.current) {
+      cancelAnimationFrame(requestRef.current);
+      requestRef.current = 0;
+    }
+    
+    // 画面を漆黒に塗りつぶす
+    if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext("2d");
+        if (ctx) {
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        }
+    }
+    setDebugInfo("Camera Stopped (Paused)");
+  }, [setDebugInfo]);
+
+  // ■ カメラを開始する関数
+  const startCamera = useCallback(async () => {
+    try {
+        // AIモデルがまだ準備できていなければ待つ（本来はロード済みのはず）
+        if (!faceLandmarkerRef.current || !handLandmarkerRef.current) {
+            console.log("Waiting for models...");
+            return;
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+        streamRef.current = stream;
+
+        if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            videoRef.current.addEventListener("loadeddata", predictWebcam);
+            videoRef.current.onloadeddata = () => {
+                videoRef.current?.play();
+                predictWebcam();
+            };
+        }
+        setDebugInfo("Camera Started");
+    } catch (e) {
+        console.error("Camera Error:", e);
+        setDebugInfo("Camera Error: " + String(e));
+    }
+  }, [setDebugInfo]); // predictWebcamは依存に入れない（ループするため）
+
+  // ■ 初期化（MediaPipeのロード）
   useEffect(() => {
+    let isMounted = true;
     async function setupMediaPipe() {
       try {
-        setDebugInfo("Loading MediaPipe models...");
+        setDebugInfo("Loading AI Models...");
         const filesetResolver = await FilesetResolver.forVisionTasks(
           "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
         );
 
-        faceLandmarkerRef.current = await FaceLandmarker.createFromOptions(filesetResolver, {
+        const faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
           baseOptions: {
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
             delegate: "GPU"
@@ -65,7 +125,7 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
           numFaces: 1
         });
 
-        handLandmarkerRef.current = await HandLandmarker.createFromOptions(filesetResolver, {
+        const handLandmarker = await HandLandmarker.createFromOptions(filesetResolver, {
           baseOptions: {
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
             delegate: "GPU"
@@ -93,75 +153,60 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         setVisionReady(true);
         setWebcamRunning(true); 
 
+        if (isMounted) {
+            faceLandmarkerRef.current = faceLandmarker;
+            handLandmarkerRef.current = handLandmarker;
+            setVisionReady(true);
+            setDebugInfo("Models Ready.");
+            
+            // 初回ロード完了時に、ポーズしていなければカメラ起動
+            if (!isPaused) {
+                startCamera();
+            }
+        }
       } catch (error) {
-        console.error("Error setting up MediaPipe:", error);
-        setDebugInfo("Error loading vision models");
+        console.error(error);
       }
     }
-
     setupMediaPipe();
 
     return () => {
-      cancelAnimationFrame(requestRef.current);
-      if (videoRef.current && videoRef.current.srcObject) {
-         try {
-             const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-             tracks.forEach(t => t.stop());
-         } catch(e) { /* ignore */ }
-      }
-    }
-  }, [setVisionReady, setDebugInfo]);
-
-  // Re-enable webcam effect
-  useEffect(() => {
-    if (webcamRunning) {
-      const enableCam = async () => {
-         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                try {
-                    await videoRef.current.play(); 
-                } catch (e) {
-                    console.warn("Video play interrupted or failed:", e);
-                }
-                videoRef.current.addEventListener("loadeddata", predictWebcam);
-                if (videoRef.current.readyState >= 2) {
-                    predictWebcam();
-                }
-            }
-         } catch(e) {
-             console.error("Camera Error: ", e);
-             setDebugInfo("Camera Error: " + String(e));
-         }
-      };
-      
-      enableCam();
-    }
-    
-    return () => {
-        if(requestRef.current) cancelAnimationFrame(requestRef.current);
+        isMounted = false;
+        stopCamera(); // アンマウント時は確実に停止
     };
-  }, [webcamRunning]);
+  }, []); // 初回のみ実行
+
+  // ■ isPaused の変化に合わせてカメラをON/OFFする
+  useEffect(() => {
+    // MediaPipeのロードが終わっていない場合は無視（ロード完了時の処理に任せる）
+    if (!faceLandmarkerRef.current) return;
+
+    if (isPaused) {
+        stopCamera();
+    } else {
+        startCamera();
+    }
+  }, [isPaused, startCamera, stopCamera]);
 
 
+  // ■ AI推論ループ
   const predictWebcam = () => {
-    if (!videoRef.current || !canvasRef.current) return;
+    // 停止指示が出ていたらループ終了
+    if (!videoRef.current || !canvasRef.current || !streamRef.current) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
 
-    // Always draw video frame if available
-    if(video.videoWidth > 0 && ctx) {
+    if (video.videoWidth > 0 && ctx) {
          if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
              canvas.width = video.videoWidth;
              canvas.height = video.videoHeight;
          }
+         // 映像を描画（フィルタなし、鮮明に）
          ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
     }
 
-    // Pause Check
     if (isPausedRef.current) {
         requestRef.current = requestAnimationFrame(predictWebcam);
         return; 
@@ -174,19 +219,16 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         const currentTime = performance.now();
         const deltaTime = lastFrameTimeRef.current === 0 ? 16 : currentTime - lastFrameTimeRef.current;
         lastFrameTimeRef.current = currentTime;
-        lastVideoTimeRef.current = video.currentTime;
 
         try {
             const drawingUtils = ctx ? new DrawingUtils(ctx) : null;
 
-            // Run Face Detection
+            // Face Detection
             const faceResult = faceLandmarkerRef.current.detectForVideo(video, startTimeMs);
             if (faceResult.faceLandmarks && faceResult.faceLandmarks.length > 0) {
-                if(drawingUtils) {
+                 if(drawingUtils) {
                     for (const landmarks of faceResult.faceLandmarks) {
                         drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_TESSELATION, {color: "#C0C0C070", lineWidth: 1});
-                        drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE, { color: "#FF3030" });
-                        drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_LEFT_EYE, { color: "#30FF30" });
                     }
                 }
                 const landmarks = faceResult.faceLandmarks[0];
@@ -200,7 +242,7 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
                 }
             }
 
-            // Run Hand Detection
+            // Hand Detection
             const handResult = handLandmarkerRef.current.detectForVideo(video, startTimeMs);
             if (handResult.landmarks && drawingUtils) {
                 for (const landmarks of handResult.landmarks) {
@@ -215,10 +257,11 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
             processPoseForPedals(poseResult, deltaTime, drawingUtils, handInfo);
 
         } catch (e) {
-            console.error("Prediction error:", e);
+            console.error(e);
         }
     }
 
+    // 次のフレームを要求
     requestRef.current = requestAnimationFrame(predictWebcam);
   };
 
@@ -609,20 +652,21 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         alignItems: 'flex-end',
         opacity: 0.9,
     }}>
-        <video ref={videoRef} style={{ position: 'absolute', opacity: 0, zIndex: -1 }} autoPlay playsInline muted></video>
-
+        {/* videoタグは非表示で裏で動かす */}
+        <video ref={videoRef} style={{ display: 'none' }} autoPlay playsInline muted></video>
+        
         <div style={{
           position: "relative",
-          width: "280px",
-          height: "210px",
-          borderRadius: '12px',
-          overflow: 'hidden',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+          width: "240px",
+          height: "180px",
+          backgroundColor: "black", // キャンバスの裏地も黒にしておく
+          borderRadius: '10px',
+          overflow: 'hidden'
         }}>
             <canvas ref={canvasRef} style={{
                 width: '100%',
                 height: '100%',
-                backgroundColor: 'black',
+                backgroundColor: 'black', // 停止時はここが見える
                 transform: 'scaleX(-1)'
             }} />
         </div>

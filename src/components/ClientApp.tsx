@@ -8,6 +8,7 @@ import { FeedbackScreen } from '@/components/ui/FeedbackScreen';
 import { LessonSelector } from '@/components/ui/LessonSelector';
 import dynamic from 'next/dynamic';
 import { Suspense, Component, ReactNode, useState } from 'react';
+import { useDrivingFeedback } from '@/hooks/useDrivingFeedback';
 
 const VisionController = dynamic(() => import('@/components/vision/VisionController'), { ssr: false });
 const Scene = dynamic(() => import('@/components/simulation/Scene').then(mod => mod.Scene), { ssr: false });
@@ -111,24 +112,27 @@ export default function ClientApp() {
   const isPaused = useDrivingStore(state => state.isPaused);
   const setIsPaused = useDrivingStore(state => state.setIsPaused);
 
+  useDrivingFeedback(); // Activate Feedback Logic
+
+
   // クリックした時の動作（ボタンの上でクリックした時は反応しないようにする工夫付き）
   const handleGlobalClick = (e: React.MouseEvent) => {
     // もしクリックした場所が「ボタン」なら、一時停止機能は発動させない（ボタンの邪魔をしないため）
     if ((e.target as HTMLElement).closest('button')) {
       return;
     }
-    setIsPaused(!isPaused);
+    if (screen === 'driving'){setIsPaused(!isPaused);}
   };
 
   return (
     <ErrorBoundary>
         <div 
-            style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden', cursor: 'pointer' }} 
+            style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden', cursor: screen === 'driving' ? 'pointer' : 'default' }} 
             onClick={handleGlobalClick}
         >
           
           {/* Pause Overlay */}
-          {isPaused && (
+          {screen === 'driving' && isPaused && (
             <div style={{
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
               backgroundColor: 'rgba(0, 0, 0, 0.6)', 
