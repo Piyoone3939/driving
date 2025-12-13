@@ -6,8 +6,6 @@ const LESSONS = [
   { id: 'straight', label: '直線' },
   { id: 'left-turn', label: '左折' },
   { id: 'right-turn', label: '右折' },
-
-  // ✅ 追加
   { id: 's-curve', label: 'S字' },
   { id: 'crank', label: 'クランク' },
 ] as const;
