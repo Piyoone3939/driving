@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-interface ReplayFrame {
+export interface ReplayFrame {
   timestamp: number;
   position: [number, number, number];
   rotation: [number, number, number]; // Euler angles
