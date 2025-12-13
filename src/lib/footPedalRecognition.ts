@@ -353,7 +353,7 @@ export function recognizeAcceleration(
   const POSITION_THRESHOLD = 0.03; // 基準位置と判定する閾値（余裕を持たせて安定化）
   const ACCEL_MOVE_THRESHOLD = 0.01; // アクセル踏み込みと判定する閾値（体の中心から右側へ）
   const ACCEL_RETURN_THRESHOLD = 0.02; // アクセルから戻る際の閾値（ヒステリシス）
-  const ANGLE_SENSITIVITY = 2.5; // 角度の感度
+  const ANGLE_SENSITIVITY = 3.5; // 角度の感度
   const KNEE_ANGLE_THRESHOLD = 0.10; // 腰-膝角度の閾値（ラジアン、約5.8度）
 
   let isAccelPressed = false;
@@ -394,8 +394,8 @@ export function recognizeAcceleration(
 
       // 基本的なスロットル値（移動距離ベース）
       const moveDistance = Math.abs(horizontalMovement);
-      const baseThrottle = Math.min((moveDistance - ACCEL_MOVE_THRESHOLD) / 0.15, 0.7);
-      throttle = Math.max(0.15, baseThrottle); // クリープ現象を考慮して最低15%
+      const baseThrottle = Math.min((moveDistance - ACCEL_MOVE_THRESHOLD) / 0.1, 0.8);
+      throttle = Math.max(0.20, baseThrottle); // クリープ現象を考慮して最低20%
     } else {
       // アクセル踏み込み位置が記録済み
       // 踏み込み位置からの距離を計算
@@ -409,7 +409,7 @@ export function recognizeAcceleration(
         isAccelPressed = true;
 
         // 基本的なスロットル値
-        const baseThrottle = 0.5;
+        const baseThrottle = 0.6;
 
         // 足先の角度による強弱調整
         if (calibration.accelPressAngle !== null) {
@@ -417,7 +417,7 @@ export function recognizeAcceleration(
 
           // 足先が下がる（角度が大きくなる）とアクセルが強くなる
           const angleAdjustment = angleDiff * ANGLE_SENSITIVITY;
-          throttle = Math.max(0.15, Math.min(1.0, baseThrottle + angleAdjustment));
+          throttle = Math.max(0.20, Math.min(1.0, baseThrottle + angleAdjustment));
         } else {
           throttle = baseThrottle;
         }
@@ -471,69 +471,63 @@ export function recognizeBraking(
     };
   }
 
+  const leftHip = landmarks[POSE_LANDMARKS.LEFT_HIP];
+  const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
+  const rightKnee = landmarks[POSE_LANDMARKS.RIGHT_KNEE];
   const rightAnkle = landmarks[POSE_LANDMARKS.RIGHT_ANKLE];
   const rightFootIndex = landmarks[POSE_LANDMARKS.RIGHT_FOOT_INDEX];
 
-  // 足先の現在の角度
-  const currentAngle = calculateFootAngle(rightAnkle, rightFootIndex);
-  const angleDiff = currentAngle - calibration.rightFootAngle;
+  // 現在の腰の中点を計算
+  const currentHipCenter = {
+    x: (leftHip.x + rightHip.x) / 2,
+    y: (leftHip.y + rightHip.y) / 2,
+    z: (leftHip.z + rightHip.z) / 2,
+  };
 
-  // ブレーキの閾値（基準位置よりも下に傾く）
-  const BRAKE_THRESHOLD = 0.15; // ラジアン（アクセルとの競合を避けるため広めに設定）
-  const MAX_BRAKE_ANGLE = 0.4; // 最大ブレーキ角度
+  // 現在の腰中点から右膝への角度を計算
+  const currentHipToKneeAngle = calculateAngleBetweenPoints(
+    currentHipCenter,
+    { x: rightKnee.x, y: rightKnee.y, z: rightKnee.z }
+  );
+
+  // キャリブレーション時の角度との差分を計算
+  const angleDiff = Math.abs(currentHipToKneeAngle - calibration.hipToRightKneeAngle);
+
+  // ブレーキと判定する角度の閾値
+  const BRAKE_ANGLE_THRESHOLD = 1.0; // ラジアン（約5.8度）の範囲内であればブレーキと判定
+
+  // 足先の現在の角度（ブレーキの強弱判定用）
+  const currentFootAngle = calculateFootAngle(rightAnkle, rightFootIndex);
+  const footAngleDiff = currentFootAngle - calibration.rightFootAngle;
+  const MAX_BRAKE_FOOT_ANGLE = 0.3;
 
   let isBrakePressed = false;
   let brake = 0;
   let brakePressDuration = previousState.brakePressDuration;
   let brakePressCount = previousState.brakePressCount;
 
-  // 足先が下方向に傾いているか判定（ブレーキを踏んでいる）
-  if (angleDiff > BRAKE_THRESHOLD) {
+  // 腰-膝の角度がキャリブレーション時の角度とほぼ同じか判定
+  if (angleDiff < BRAKE_ANGLE_THRESHOLD) {
     isBrakePressed = true;
 
     // 角度に基づいてブレーキの基本強さを計算
-    const angleBasedBrake = Math.min((angleDiff - BRAKE_THRESHOLD) / MAX_BRAKE_ANGLE, 1.0);
+    const angleBasedBrake = Math.min(footAngleDiff / MAX_BRAKE_FOOT_ANGLE, 1.0);
 
     // ブレーキを踏んでいる時間を累積
     brakePressDuration += deltaTime;
-
-
-    brake = angleBasedBrake * 0.5
-
-    // // ブレーキの強さを時間で調整
-    // if (brakePressDuration < 300) {
-    //   // 300ms未満：短時間のブレーキ（ポンピングブレーキ）
-    //   // 踏んでいる時間が短いほど減速が小さい
-    //   const timeFactor = brakePressDuration / 300; // 0.0 - 1.0
-    //   brake = angleBasedBrake * timeFactor * 0.4; // 最大40%の制動力
-    // } else if (brakePressDuration < 1000) {
-    //   // 300ms - 1秒：通常のブレーキ
-    //   brake = angleBasedBrake * 0.7; // 70%の制動力
-    // } else {
-    //   // 1秒以上：長時間のブレーキ（徐々に減速を強める）
-    //   const longPressFactor = Math.min(1.0 + (brakePressDuration - 1000) / 3000, 1.5);
-    //   brake = Math.min(angleBasedBrake * longPressFactor, 1.0);
-    // }
+    
+    // シンプルなブレーキ強度計算
+    brake = Math.max(0, Math.min(angleBasedBrake, 1.0)) * 1.0; // 最大100%の制動力
 
   } else {
     // ブレーキを離した
     if (previousState.isBrakePressed) {
       // 前回はブレーキを踏んでいた = 1回のブレーキ操作が完了
       brakePressCount += 1;
-
-      // ポンピングブレーキのログ（デバッグ用）
-      if (brakePressDuration < 300) {
-        console.log(`ポンピングブレーキ検出: ${brakePressCount}回目, 継続時間: ${brakePressDuration}ms`);
-      }
-
       brakePressDuration = 0;
     }
-
     isBrakePressed = false;
     brake = 0;
-
-    // ブレーキカウントのリセット（2秒間ブレーキを踏まなかったらリセット）
-    // Note: この実装ではsetTimeoutを使わずに、呼び出し側でリセットロジックを実装する方が良い
   }
 
   return { brake, isBrakePressed, brakePressDuration, brakePressCount };

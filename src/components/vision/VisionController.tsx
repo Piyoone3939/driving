@@ -35,7 +35,7 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
 
   // 1ユーロフィルタマネージャー
   const poseFilterManagerRef = useRef<PoseLandmarkFilterManager>(
-    new PoseLandmarkFilterManager(1.0, 0.007, 1.0)
+    new PoseLandmarkFilterManager(1.0, 0.004, 1.5)
   );
   const streamRef = useRef<MediaStream | null>(null); // ストリーム管理用
 
