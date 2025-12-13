@@ -33,6 +33,9 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
   const requestRef = useRef<number>(0);
   const lastFrameTimeRef = useRef<number>(0);
 
+  const lastProcessingTimeRef = useRef<number>(0);
+  const THROTTLE_MS = 100;
+
   // 1ユーロフィルタマネージャー
   const poseFilterManagerRef = useRef<PoseLandmarkFilterManager>(
     new PoseLandmarkFilterManager(1.0, 0.004, 1.5)
@@ -49,6 +52,13 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
       setDebugInfo("Paused");
     }
   }, [isPaused, setSteering, setSpeed, setDebugInfo]);
+
+  const stopLoop = useCallback(() => {
+    if (requestRef.current) {
+      cancelAnimationFrame(requestRef.current);
+      requestRef.current = 0;
+    }
+  }, [])
 
   // ■ カメラを停止する関数（物理的に切断）
   const stopCamera = useCallback(() => {
@@ -87,7 +97,7 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
             return;
         }
 
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
         streamRef.current = stream;
 
         if (videoRef.current) {
@@ -188,6 +198,7 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         startCamera();
     }
   }, [isPaused, startCamera, stopCamera]);
+  
 
 
   // ■ AI推論ループ
@@ -212,6 +223,12 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         requestRef.current = requestAnimationFrame(predictWebcam);
         return; 
     }
+    const now = performance.now();
+    if (now - lastProcessingTimeRef.current < THROTTLE_MS){
+      requestRef.current = requestAnimationFrame(predictWebcam);
+      return;
+    }
+    lastProcessingTimeRef.current = now;
 
     if (faceLandmarkerRef.current && handLandmarkerRef.current && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0 && video.currentTime !== lastVideoTimeRef.current) {
       // eslint-disable-next-line react-hooks/purity
