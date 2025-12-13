@@ -54,25 +54,20 @@ export function getCoursePath(
       )
     );
   } else if (lesson === "s-curve") {
-    // ✅ 開始点を (0,0,20) に揃える（車の開始位置と合わせる）
-    // ✅ CatmullRom は 'centripetal' 推奨（変な膨らみ/ループが出にくい）
     const curve = new THREE.CatmullRomCurve3(
-      [
+        [
         new THREE.Vector3(0, 0, 20),
         new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(8, 0, -25),
-        new THREE.Vector3(-8, 0, -50),
-        new THREE.Vector3(8, 0, -75),
-        new THREE.Vector3(-8, 0, -100),
-        new THREE.Vector3(0, 0, -120),
-      ],
-      false,
-      "centripetal",
-      0.5
+        new THREE.Vector3(14, 0, -30),
+        new THREE.Vector3(-14, 0, -60),
+        new THREE.Vector3(0, 0, -100),
+        ],
+        false,
+        "centripetal",
+        0.5
     );
     path.add(curve);
-  } else if (lesson === "crank") {
-    // ✅ クランクは「直線＋90度コーナー」を CurvePath で作ると安定
+    } else if (lesson === "crank") {
     const r = 4;   // コーナー丸め（小さめがクランクっぽい）
     const xR = 16; // 右に振る量
     const xL = -8; // 左に振る量

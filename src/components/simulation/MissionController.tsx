@@ -40,11 +40,10 @@ export const MISSION_GOALS: Record<
   },
 
   "s-curve": {
-    // getCoursePath(): 終点が (0,0,-120) なのでゴールもそこへ
-    position: [0, 0, -120],
+    position: [0, 0, -100],
     size: [10, 5, 5],
     rotation: 0,
-  },
+    },
 
   crank: {
     // getCoursePath(): 最後は xL=-8 の直進で ( -8,0,-100 ) が終点
