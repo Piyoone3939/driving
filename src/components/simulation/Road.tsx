@@ -12,8 +12,8 @@ export function Road() {
     const path = getCoursePath(currentLesson);
     const steps = 200; // Smoother curve
 
- 
-    
+
+
     // Original Extrude Logic as fallback/standard
     // 1. Asphalt Road Surface
     const roadShape = new THREE.Shape();
@@ -42,7 +42,7 @@ export function Road() {
         steps: steps,
         bevelEnabled: false
     });
-    
+
     // No rotations needed.
 
     // 2. Curbs (Side stones)
@@ -56,13 +56,13 @@ export function Road() {
     curbShape.lineTo(0, -width);
     curbShape.lineTo(curbH, -width);
     curbShape.lineTo(curbH, -width - curbW);
-    
+
     const rightCurbShape = new THREE.Shape();
     rightCurbShape.moveTo(0, width);
     rightCurbShape.lineTo(0, width + curbW);
     rightCurbShape.lineTo(curbH, width + curbW);
     rightCurbShape.lineTo(curbH, width);
-    
+
     const curbGeo = new THREE.ExtrudeGeometry([curbShape, rightCurbShape], {
         extrudePath: path,
         steps: steps,
@@ -73,9 +73,9 @@ export function Road() {
     const lineShape = new THREE.Shape();
     const lineW = 0.1;
     // Position slightly "above" road. Road is X=[0, 0.05]. Line should be X=0.06.
-    lineShape.moveTo(0.06, -lineW); 
+    lineShape.moveTo(0.06, -lineW);
     lineShape.lineTo(0.06, lineW);
-    lineShape.lineTo(0.06, lineW); 
+    lineShape.lineTo(0.06, lineW);
     lineShape.lineTo(0.06, -lineW);
 
     const lineGeo = new THREE.ExtrudeGeometry(lineShape, {
@@ -85,7 +85,7 @@ export function Road() {
     });
 
     return { roadGeo, curbGeo, lineGeo };
-    
+
   }, [currentLesson]);
 
   return (
@@ -102,8 +102,8 @@ export function Road() {
       </mesh>
 
       {/* Center Line (White) */}
-      {/* 
-         Solid line for now. For dashed, we'd need a texture or shader, 
+      {/*
+         Solid line for now. For dashed, we'd need a texture or shader,
          or break the geometry. Solid is fine for "No Passing" or just ease.
          Let's assume white center line.
       */}

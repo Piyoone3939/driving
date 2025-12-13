@@ -16,22 +16,22 @@ export function Scene({ cameraTarget = 'player' }: { cameraTarget?: 'player' | '
       <Canvas dpr={[1, 1.5]} camera={{ position: [0, 1.2, 0.5], fov: 75 }} style={{ width: '100%', height: '100%', display: 'block' }}>
         {/* <color attach="background" args={['#87CEEB']} /> */}
         {/* <fog attach="fog" args={['#87CEEB', 20, 100]} /> */}
-        
+
         <Suspense fallback={null}>
           <Surroundings />
-          
+
           {/* Lights */}
           <ambientLight intensity={0.5} />
-          <directionalLight 
-            position={[10, 10, 5]} 
-            intensity={1} 
+          <directionalLight
+            position={[10, 10, 5]}
+            intensity={1}
           />
-          
+
           <Car cameraTarget={cameraTarget} />
           <Road />
           <RoadProps />
           <GoalMarker />
-          
+
           {/* Helper controls for debugging, eventually remove or limit */}
           {/* <OrbitControls /> */}
         </Suspense>
@@ -57,7 +57,7 @@ function GoalMarker() {
                 <boxGeometry args={[goal.size[0], goal.size[1], goal.size[2]]} />
                 <meshStandardMaterial color="#4ade80" transparent opacity={0.3} />
             </mesh>
-            
+
             {/* Floating Text */}
             <Text
                 position={[0, 4, 0]}
@@ -70,7 +70,7 @@ function GoalMarker() {
             >
                 GOAL
             </Text>
-            
+
             {/* Checkered Flag Pattern on floor? Or just glowing ring */}
             <mesh rotation={[-Math.PI/2, 0, 0]} position={[0, 0.1, 0]}>
                 <ringGeometry args={[3, 4, 32]} />
