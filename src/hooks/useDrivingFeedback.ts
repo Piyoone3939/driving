@@ -21,51 +21,9 @@ export function useDrivingFeedback() {
     const lastLogTimeRef = useRef<number>(0);
     const gazeTimerRef = useRef<number>(0);
 
+    // Optimization: Real-time feedback disabled for performance. 
+    // Analysis is now done post-mission in store.ts (calculateMissionResult).
     useEffect(() => {
-        if (missionState !== 'active') return;
-
-        const now = Date.now();
-        if (now - lastLogTimeRef.current < COOLDOWN_MS) return;
-
-        // 1. Route Accuracy
-        if (isOffTrack) {
-            addFeedbackLog({
-                time: now,
-                type: 'KAIZEN',
-                message: 'コースを逸脱しています。'
-            });
-            lastLogTimeRef.current = now;
-            return; 
-        }
-
-        // 2. Speed Check
-        const limit = SPEED_LIMITS[currentLesson] || 40;
-        if (speed > limit + 5) { // Buffer +5
-             addFeedbackLog({
-                time: now,
-                type: 'KAIZEN',
-                message: `${currentLesson === 'crank' ? 'クランク' : '走行'}速度が速すぎます (${Math.floor(speed)}km/h)`
-            });
-            lastLogTimeRef.current = now;
-            return;
-        }
-
-        // 3. Gaze Check
-        // If gaze.x is mostly > 0.6 or < -0.6 for 2 seconds
-        if (Math.abs(gaze.x) > 0.8) { // Threshold
-            if (gazeTimerRef.current === 0) gazeTimerRef.current = now;
-            else if (now - gazeTimerRef.current > 2000) {
-                 addFeedbackLog({
-                    time: now,
-                    type: 'KAIZEN',
-                    message: 'わき見運転検知：前方を確認してください'
-                });
-                lastLogTimeRef.current = now;
-                gazeTimerRef.current = 0; // Reset
-            }
-        } else {
-            gazeTimerRef.current = 0;
-        }
-
-    }, [speed, isOffTrack, gaze, currentLesson, missionState, addFeedbackLog]);
+        // Kept for future real-time features if needed.
+    }, []);
 }

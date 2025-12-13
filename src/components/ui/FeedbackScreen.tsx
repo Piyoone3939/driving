@@ -2,6 +2,7 @@ import { useDrivingStore } from "@/lib/store";
 import { Scene } from "../simulation/Scene"; // Re-use scene for replay
 import { Canvas } from "@react-three/fiber";
 import { Suspense, useEffect, useRef } from "react";
+import { getCoursePath } from "@/lib/course";
 
 export function FeedbackScreen() {
   const setScreen = useDrivingStore(state => state.setScreen);
@@ -14,13 +15,26 @@ export function FeedbackScreen() {
   const setReplayViewMode = useDrivingStore(state => state.setReplayViewMode); // New
   const feedbackLogs = useDrivingStore(state => state.feedbackLogs); // New
 
+
+
+  const calculateMissionResult = useDrivingStore(state => state.calculateMissionResult); // Action
+  const analyzedRef = useRef(false);
+
   // Auto-start replay mode when entering this screen
   useEffect(() => {
     setIsReplaying(true);
+    
+    // Run Analysis once
+    if (!analyzedRef.current) {
+        analyzedRef.current = true;
+        const path = getCoursePath(currentLesson);
+        calculateMissionResult(path);
+    }
+
     return () => {
       setIsReplaying(false);
     };
-  }, [setIsReplaying]);
+  }, [setIsReplaying, currentLesson, calculateMissionResult]);
 
   const handleRetry = () => {
     setIsReplaying(false);

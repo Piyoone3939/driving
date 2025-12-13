@@ -165,7 +165,7 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
     }
 
     let startTimeMs = performance.now();
-    if (faceLandmarkerRef.current && handLandmarkerRef.current && video.currentTime !== lastVideoTimeRef.current) {
+    if (faceLandmarkerRef.current && handLandmarkerRef.current && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0 && video.currentTime !== lastVideoTimeRef.current) {
         lastVideoTimeRef.current = video.currentTime;
         
         try {
@@ -264,17 +264,37 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
           
           const angle = Math.atan2(dy, dx);
           
-          // Digital Steering Logic: Snap to 1 or -1
-          const threshold = 0.1;
+          // Analog Steering Logic
+          // Angle is in radians. 
+          // 0 is Center.
+          // Left Turn (CCW) -> Negative Angle.
+          // Right Turn (CW) -> Positive Angle.
+          
+          // Sensitivity Factor: 
+          // 90 degrees (PI/2 = 1.57) should be full lock? 
+          // Or 45 degrees (0.78)?
+          // Let's try aiming for ~60 degrees for full lock.
+          // 1.0 / (PI/3) ~= 1.0.
+          // Let's try multiplier 1.5. 
+          // If angle is -0.7 (40 deg), steering = 1.05 (Full).
+          
+          // Based on previous code `steering = -Math.sign(angle)`, 
+          // we maintain the negative sign relationship.
+          
+          const sensitivity = 0.8; // Lower sensitivity for smoother analog feel (Full lock at ~70 deg)
+          const deadzone = 0.05;
           let steering = 0;
-          if (Math.abs(angle) > threshold) {
-              // Invert sign as requested
-              steering = -Math.sign(angle); 
+          
+          if (Math.abs(angle) > deadzone) {
+              steering = -angle * sensitivity;
           }
+          
+          // Clamp to -1 to 1
+          steering = Math.max(-1, Math.min(1, steering));
           
           setSteering(steering);
           
-          info += ` | Ang: ${angle.toFixed(2)} | Str: ${steering}`;
+          info += ` | Ang: ${angle.toFixed(2)} | Str: ${steering.toFixed(2)}`;
       } else {
           setSteering(0);
           info += " | Need 2 hands";

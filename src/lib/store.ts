@@ -1,10 +1,12 @@
 import { create } from 'zustand';
+import * as THREE from 'three';
 
 export interface ReplayFrame {
   timestamp: number;
   position: [number, number, number];
   rotation: [number, number, number]; // Euler angles
   steering: number;
+  speed: number;
   headRotation: { pitch: number; yaw: number; roll: number };
 }
 
@@ -59,6 +61,7 @@ export interface DrivingState {
   missionEndTime: number;
   deviationPenalty: number;
   addDeviationPenalty: (amount: number) => void;
+  calculateMissionResult: (coursePath: THREE.CurvePath<THREE.Vector3>) => void;
 
   // Replay Actions
   setIsReplaying: (isReplaying: boolean) => void; 
@@ -131,6 +134,64 @@ export const useDrivingStore = create<DrivingState>((set) => ({
   
   deviationPenalty: 0,
   addDeviationPenalty: (amount) => set((s) => ({ deviationPenalty: s.deviationPenalty + amount })),
+  
+  calculateMissionResult: (coursePath) => {
+      const state = useDrivingStore.getState();
+      const frames = state.replayData;
+      const currentLesson = state.currentLesson;
+
+      let deviationPenalty = 0;
+      let speedViolations = 0;
+      
+      const pathResolution = 100;
+      const PENALTY_DIST = 2.5; 
+      const SPEED_LIMIT = currentLesson === 'straight' ? 60 : 20;
+
+      // Pre-calculate path points for fast lookup
+      // Note: This blocks the main thread, but it's during feedback screen load.
+      // We can use a Web Worker later if needed.
+      const pathPoints: THREE.Vector3[] = [];
+      for(let i=0; i<=pathResolution; i++) {
+          pathPoints.push(coursePath.getPointAt(i/pathResolution));
+      }
+
+      frames.forEach(frame => {
+          // 1. Deviation
+          const pos = new THREE.Vector3(frame.position[0], frame.position[1], frame.position[2]);
+          let minDist = 1000;
+          for(const p of pathPoints) {
+              const d = p.distanceTo(pos);
+              if(d < minDist) minDist = d;
+          }
+          
+          if (minDist > PENALTY_DIST) {
+              deviationPenalty += 0.05 + (minDist - PENALTY_DIST) * 0.01;
+          }
+
+          // 2. Speed
+          if (frame.speed && frame.speed > SPEED_LIMIT + 5) { 
+              speedViolations++;
+          }
+      });
+
+      // Update State
+      set((s) => {
+          const newLogs = [...s.feedbackLogs];
+          
+          if (speedViolations > 30) { 
+              newLogs.push({
+                  time: Date.now(),
+                  type: 'KAIZEN',
+                  message: `速度超過がありました (最大制限: ${SPEED_LIMIT}km/h)`
+              });
+          }
+          
+          return {
+              deviationPenalty: s.deviationPenalty + deviationPenalty,
+              feedbackLogs: newLogs
+          };
+      });
+  },
 
   setOffTrack: (isOff) => set({ isOffTrack: isOff }),
   setDrivingFeedback: (msg) => set({ drivingFeedback: msg }),
