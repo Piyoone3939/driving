@@ -170,8 +170,12 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
         // CHECK GOAL
         if (checkMissionGoal(currentLesson, groupRef.current.position)) {
              useDrivingStore.setState({ replayData: recordedFrames.current });
-             setMissionState('success');
-             setScreen('feedback'); 
+             setMissionState('success'); // Triggers GoalEffects
+             
+             // Delay transition to feedback screen to show effects
+             setTimeout(() => {
+                 setScreen('feedback'); 
+             }, 3000);
              return;
         }
 

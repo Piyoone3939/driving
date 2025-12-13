@@ -179,8 +179,31 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
                         drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_TESSELATION, {color: "#C0C0C070", lineWidth: 1});
                     }
                  }
-                 // ... ここにHeadRotationやGazeの計算ロジックを入れる（省略せず元のコードを使ってOK）
-                 // 今回は短縮のために計算部分は省略しているが、君の元のロジックをここに維持してくれ
+                 const landmarks = faceResult.faceLandmarks[0];
+                if(landmarks) {
+                    const nose = landmarks[1];
+                    const leftEar = landmarks[234];
+                    const rightEar = landmarks[454];
+                    const midEarX = (leftEar.x + rightEar.x) / 2;
+                    const yawEstimate = (nose.x - midEarX) * 20; 
+                    setHeadRotation({ pitch: 0, yaw: -yawEstimate, roll: 0 }); 
+
+                    // Gaze Calculation
+                    const leftInner = landmarks[33].x;
+                    const leftOuter = landmarks[133].x;
+                    const leftIris = landmarks[468].x;
+                    
+                    const rightInner = landmarks[362].x;
+                    const rightOuter = landmarks[263].x;
+                    const rightIris = landmarks[473].x;
+                    
+                    const leftRatio = (leftIris - leftInner) / (leftOuter - leftInner);
+                    const rightRatio = (rightIris - rightInner) / (rightOuter - rightInner);
+                    
+                    const avgRatio = (leftRatio + rightRatio) / 2;
+                    const gazeX = (avgRatio - 0.5) * 5; 
+                    setGaze({ x: gazeX, y: 0 });
+                }
             }
 
             // Hand Detection
@@ -191,8 +214,7 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
                     drawingUtils.drawLandmarks(landmarks, {color: "#FF0000", lineWidth: 2});
                 }
             }
-            // ハンドジェスチャー処理もここに維持
-            // processHandGestures(handResult, ...);
+            processHandGestures(handResult, setSteering, setPedals, setDebugInfo);
             
         } catch (e) {
             console.error(e);
@@ -203,7 +225,63 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
     requestRef.current = requestAnimationFrame(predictWebcam);
   };
 
-  // ※ processHandGestures 関数等は元のまま維持すること
+  const processHandGestures = (result: HandLandmarkerResult, setSteering: any, setPedals: any, setDebugInfo: any) => {
+      const hands = result.landmarks.length;
+      let info = `Hands: ${hands}`;
+
+      if (hands === 2 && result.handedness.length === 2) {
+          let leftHandLandmarks = result.landmarks[0];
+          let rightHandLandmarks = result.landmarks[1];
+          
+          const label0 = result.handedness[0]?.[0]?.categoryName ?? 'Left';
+          const label1 = result.handedness[1]?.[0]?.categoryName ?? 'Right';
+
+          if (label0 !== label1) {
+              if (label0 === 'Left') {
+                  leftHandLandmarks = result.landmarks[0];
+                  rightHandLandmarks = result.landmarks[1];
+              } else {
+                  leftHandLandmarks = result.landmarks[1];
+                  rightHandLandmarks = result.landmarks[0];
+              }
+          } else {
+              const h1 = result.landmarks[0][9];
+              const h2 = result.landmarks[1][9];
+              if (h1.x < h2.x) {
+                  leftHandLandmarks = result.landmarks[0];
+                  rightHandLandmarks = result.landmarks[1];
+              } else {
+                  leftHandLandmarks = result.landmarks[1];
+                  rightHandLandmarks = result.landmarks[0];
+              }
+          }
+
+          const left = leftHandLandmarks[9]; 
+          const right = rightHandLandmarks[9];
+          
+          const dy = right.y - left.y;
+          const dx = right.x - left.x;
+          
+          const angle = Math.atan2(dy, dx);
+          
+          // Digital Steering Logic: Snap to 1 or -1
+          const threshold = 0.1;
+          let steering = 0;
+          if (Math.abs(angle) > threshold) {
+              // Invert sign as requested
+              steering = -Math.sign(angle); 
+          }
+          
+          setSteering(steering);
+          
+          info += ` | Ang: ${angle.toFixed(2)} | Str: ${steering}`;
+      } else {
+          setSteering(0);
+          info += " | Need 2 hands";
+      }
+      
+      setDebugInfo(info);
+  };
 
   return (
     <div style={{
