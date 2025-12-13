@@ -3,6 +3,8 @@ import { Scene } from "../simulation/Scene"; // Re-use scene for replay
 import { Canvas } from "@react-three/fiber";
 import { Suspense, useEffect, useRef } from "react";
 import { getCoursePath } from "@/lib/course";
+import {addDoc, collection } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export function FeedbackScreen() {
   const setScreen = useDrivingStore(state => state.setScreen);
@@ -15,10 +17,11 @@ export function FeedbackScreen() {
   const setReplayViewMode = useDrivingStore(state => state.setReplayViewMode); // New
   const feedbackLogs = useDrivingStore(state => state.feedbackLogs); // New
 
-
-
   const calculateMissionResult = useDrivingStore(state => state.calculateMissionResult); // Action
   const analyzedRef = useRef(false);
+
+  const user = useDrivingStore(state => state.user);
+  const addHistoryItem = useDrivingStore(state => state.addHistoryItem);
 
   // Auto-start replay mode when entering this screen
   useEffect(() => {
@@ -29,12 +32,50 @@ export function FeedbackScreen() {
         analyzedRef.current = true;
         const path = getCoursePath(currentLesson);
         calculateMissionResult(path);
+
+        const state = useDrivingStore.getState();
+        if (state.user){
+            saveResultToFirestore(state);
+        }
     }
 
     return () => {
       setIsReplaying(false);
     };
   }, [setIsReplaying, currentLesson, calculateMissionResult]);
+
+  const saveResultToFirestore = async ( state: any) => {
+    try {
+        const kaizenLogs = state.feedbackLogs.filter((l: any) => l.type === 'KAIZEN');
+        const kaizenPenalty = kaizenLogs.length * 5;
+        const totalPenalty = kaizenPenalty + Math.floor(state.deviationPenalty || 0);
+        const score = Math.max(0, 100 - totalPenalty);
+        
+        // Clear Time Calculation
+        const diff = state.missionEndTime - state.missionStartTime;
+        const min = Math.floor(diff / 60000);
+        const sec = Math.floor((diff % 60000) / 1000);
+        const clearTime = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+
+        const logData = {
+            userId: state.user.uid,
+            timestamp: Date.now(),
+            lesson: state.currentLesson,
+            score: score,
+            clearTime: clearTime,
+            feedbackSummary: kaizenLogs.length > 0 ? kaizenLogs[0].message + ' 他' : '素晴らしい走行でした',
+        };
+
+        // Firestoreへの保存
+        const docRef = await addDoc(collection(db, "mission_logs"), logData);
+        
+        // StoreのHistoryも更新（再フェッチを防ぐため）
+        addHistoryItem({ id: docRef.id, ...logData });
+        
+    } catch (e) {
+        console.error("Failed to save record", e);
+    }
+    }
 
   const handleRetry = () => {
     setIsReplaying(false);

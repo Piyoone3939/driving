@@ -2,12 +2,11 @@
 
 import dynamic from 'next/dynamic';
 
-const ClientApp = dynamic(() => import('@/components/ClientApp'), { ssr: false });
+const ClientApp = dynamic(
+  () => import('@/components/ClientApp').then((mod) => ({ default: mod.default })),
+  { ssr: false }
+);
 
 export default function Home() {
-  return (
-    <main className="w-full h-screen relative bg-black">
-      <ClientApp />
-    </main>
-  );
+  return <ClientApp />;
 }
