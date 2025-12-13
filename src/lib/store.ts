@@ -8,7 +8,7 @@ export interface ReplayFrame {
   headRotation: { pitch: number; yaw: number; roll: number };
 }
 
-interface DrivingState {
+export interface DrivingState {
   // Screen Management
   screen: 'home' | 'driving' | 'feedback';
   isPaused: boolean;
