@@ -9,9 +9,60 @@ import { LessonSelector } from '@/components/ui/LessonSelector';
 import dynamic from 'next/dynamic';
 import { Suspense, Component, ReactNode, useState } from 'react';
 import { useDrivingFeedback } from '@/hooks/useDrivingFeedback';
+import { AuthScreen } from '@/components/auth/AuthScreen'; 
+import { HistoryScreen } from '@/components/ui/HistoryScreen';
+import { auth } from '@/lib/firebase';
 
 const VisionController = dynamic(() => import('@/components/vision/VisionController'), { ssr: false });
 const Scene = dynamic(() => import('@/components/simulation/Scene').then(mod => mod.Scene), { ssr: false });
+
+function UserProfileHeader() {
+    const user = useDrivingStore(state => state.user);
+    const setScreen = useDrivingStore(state => state.setScreen);
+    const setUser = useDrivingStore(state => state.setUser);
+    const setMissionHistory = useDrivingStore(state => state.setMissionHistory);
+    const screen = useDrivingStore(state => state.screen);
+
+    // 運転中やフィードバック画面では邪魔になる可能性があるので、HOMEのみ表示するなど調整可
+    // 今回は常時表示しつつ、運転中は目立たなくする等の配慮も可能だが、
+    // 要件通り右上に配置する。
+    if (screen === 'driving' || screen === 'feedback' || screen === 'auth' || screen === 'history') return null; 
+
+    const handleLogout = async () => {
+        await auth.signOut();
+        setUser(null);
+        setMissionHistory([]);
+    }
+
+    return (
+        <div className="absolute top-8 right-8 z-50 flex flex-col items-end gap-2">
+            <div className="px-6 py-2 bg-slate-800/90 border-l-4 border-blue-500 rounded-r text-sm font-mono tracking-widest">PLAYER: {user ? (user.email?.split('@')[0]?.toUpperCase() || 'DRIVER') : 'GUEST'}</div>
+            <div className="flex gap-3 text-xs font-mono">
+                {user ? (
+                    <>
+                    <button 
+                    onClick={() => setScreen('history')}
+                    className='text-cyan-400 hover:text-cyan-300 transition-colors underline'
+                    >Driving History</button>
+                    <span className='test-slate-600'>|</span>
+                    <button onClick={handleLogout}
+                    className='text-slate-400 hover:text-red-400 transition-colors'
+                    >
+                        Logout
+                    </button>
+                    </>
+                 ) : (
+                    <button onClick={() => setScreen('auth')}
+                    className='text-cyan-400 hover:text-cyan-300 transition-colors'
+                    >
+                        Login / Register
+                    </button>
+                 )}
+                 </div>
+                 </div>
+    );
+}
+                
 
 class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean, error: string}> {
   constructor(props: {children: ReactNode}) {
@@ -139,7 +190,8 @@ export default function ClientApp() {
             style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden', cursor: screen === 'driving' ? 'pointer' : 'default' }} 
             onClick={handleGlobalClick}
         >
-          
+          <UserProfileHeader />
+
           {/* Pause Overlay */}
           {screen === 'driving' && isPaused && (
             <div style={{
@@ -179,6 +231,8 @@ export default function ClientApp() {
           )}
           
           {screen === 'home' && <HomeScreen />}
+          {screen === 'auth' && <AuthScreen />}
+          {screen === 'history' && <HistoryScreen />}
 
           {screen === 'driving' && (
               <>
