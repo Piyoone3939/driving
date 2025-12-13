@@ -16,7 +16,7 @@ export function RoadProps() {
                 } else if (cp.type === 'mirror') {
                     // Render Mirror
                     // Position is usually "check area", but let's assume prop is placed relative to it?
-                    // Or we should add `propPosition` to Checkpoint definition? 
+                    // Or we should add `propPosition` to Checkpoint definition?
                     // For now, place it slightly offset from the check zone center.
                     return <CurveMirror key={cp.id} position={[cp.position[0] - 5, 0, cp.position[2] - 5]} />; 
                     // Warning: offsets are hardcoded. ideally strictly defined.
@@ -49,10 +49,10 @@ function StopSign({ position }: { position: [number, number, number] }) {
                 {/* Sign Board (Triangle pointing down) */}
                 <mesh position={[0, 2.7, 0]} rotation={[0, 0, 0]}>
                    {/* In Japan, Stop sign is Inverted Red Triangle */}
-                   <cylinderGeometry args={[0.6, 0.01, 0.5, 3]} /> 
+                   <cylinderGeometry args={[0.6, 0.01, 0.5, 3]} />
                    {/* This is a prism/cone. Rotation needed. */}
                 </mesh>
-                
+
                 {/* Let's mimic Japanese Stop Sign: Inverted Red Triangle with text */}
                 <group position={[0, 2.7, 0]} rotation={[Math.PI/2, Math.PI, 0]}>
                     <mesh>
