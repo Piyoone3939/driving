@@ -165,7 +165,7 @@ export const useDrivingStore = create<DrivingState>((set) => ({
           }
           
           if (minDist > PENALTY_DIST) {
-              deviationPenalty += 0.05 + (minDist - PENALTY_DIST) * 0.01;
+              deviationPenalty += 1.0 + (minDist - PENALTY_DIST) * 0.2;
           }
 
           // 2. Speed
