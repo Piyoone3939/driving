@@ -6,6 +6,10 @@ const LESSONS = [
   { id: 'straight', label: '直線' },
   { id: 'left-turn', label: '左折' },
   { id: 'right-turn', label: '右折' },
+
+  // ✅ 追加
+  { id: 's-curve', label: 'S字' },
+  { id: 'crank', label: 'クランク' },
 ] as const;
 
 export function LessonSelector() {
@@ -29,7 +33,7 @@ export function LessonSelector() {
         <button
           key={lesson.id}
           onClick={(e) => {
-            e.stopPropagation(); // Click on button shouldn't toggle pause
+            e.stopPropagation();
             setLesson(lesson.id);
           }}
           style={{

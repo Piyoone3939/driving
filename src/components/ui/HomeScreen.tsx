@@ -5,15 +5,20 @@ const LESSONS = [
   { id: 'straight', label: '直線走行', sub: 'LEVEL 01', desc: 'BASIC CONTROL', icon: 'START' },
   { id: 'left-turn', label: '左折', sub: 'LEVEL 02', desc: 'TURNING LEFT', icon: 'LEFT' },
   { id: 'right-turn', label: '右折', sub: 'LEVEL 03', desc: 'TURNING RIGHT', icon: 'RIGHT' },
+
+  // ✅ 追加
+  { id: 's-curve', label: 'S字カーブ', sub: 'LEVEL 04', desc: 'S-CURVE', icon: 'S' },
+  { id: 'crank', label: 'クランク', sub: 'LEVEL 05', desc: 'CRANK', icon: 'C' },
 ] as const;
 
 export function HomeScreen() {
   const setLesson = useDrivingStore(state => state.setLesson);
   const setScreen = useDrivingStore(state => state.setScreen);
   const setMissionState = useDrivingStore(state => state.setMissionState);
-  const currentLesson = useDrivingStore(state => state.currentLesson); // Optional: Highlight selected
+  const currentLesson = useDrivingStore(state => state.currentLesson);
 
-  const handleSelectLesson = (lessonId: any) => {
+  // ✅ any をやめて型安全に
+  const handleSelectLesson = (lessonId: (typeof LESSONS)[number]["id"]) => {
     setLesson(lessonId);
     setMissionState('briefing');
     setScreen('driving');
@@ -21,7 +26,7 @@ export function HomeScreen() {
 
   return (
     <div className="w-full h-full relative overflow-hidden bg-black text-white font-sans selection:bg-blue-500 selection:text-white">
-      
+
       {/* 3D Background - z-0 */}
       <div className="absolute inset-0 z-0">
           <GarageScene />
@@ -29,7 +34,7 @@ export function HomeScreen() {
 
       {/* Overlay UI - z-10 */}
       <div className="absolute inset-0 z-10 flex flex-col justify-between pointer-events-none">
-          
+
           {/* Top Bar */}
           <div className="w-full p-8 flex justify-between items-start pointer-events-auto bg-gradient-to-b from-black/80 to-transparent">
               <div>
@@ -62,7 +67,7 @@ export function HomeScreen() {
                       >
                           {/* Background Gradient on Hover */}
                           <div className="absolute inset-0 bg-gradient-to-b from-blue-900/0 to-blue-900/20 group-hover:to-blue-600/20 transition-all duration-300" />
-                          
+
                           {/* Inner Content */}
                           <div className="absolute inset-0 p-6 flex flex-col justify-between text-left">
                               <div className="flex justify-between items-start">
@@ -78,12 +83,12 @@ export function HomeScreen() {
                                   </h3>
                                   <p className="text-xs text-slate-400 font-mono">{lesson.desc}</p>
                               </div>
-                              
+
                               <div className="flex justify-between items-end">
                                   <div className="text-4xl font-black text-slate-800 group-hover:text-slate-700 select-none">
                                       0{index + 1}
                                   </div>
-                                  
+
                                   <span className="text-sm font-bold text-blue-500 flex items-center gap-1 opacity-0 group-hover:opacity-100 transform translate-x-4 group-hover:translate-x-0 transition-all duration-300">
                                       START <span className="text-lg">»</span>
                                   </span>
@@ -91,7 +96,7 @@ export function HomeScreen() {
                           </div>
                       </button>
                   ))}
-                  
+
                   {/* Empty spacer for scroll padding */}
                   <div className="w-12 flex-shrink-0" />
               </div>
