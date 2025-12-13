@@ -155,7 +155,7 @@ export default function ClientApp() {
               }}>
                 PAUSED ⏸
               </h1>
-              <p style={{color: '#94a3b8', fontSize: '18px'}}>画面をクリックして再会</p>
+              <p style={{color: '#94a3b8', fontSize: '18px'}}>画面をクリックして再開</p>
               <div style={{display: 'flex', gap:'20px', marginTop:'20px'}}>
                  <button
                   onClick={handleGoHome}
