@@ -111,9 +111,16 @@ export default function ClientApp() {
   const screen = useDrivingStore(state => state.screen);
   const isPaused = useDrivingStore(state => state.isPaused);
   const setIsPaused = useDrivingStore(state => state.setIsPaused);
+  const setScreen = useDrivingStore(state => state.setScreen);
+  const setMisssionState = useDrivingStore(state => state.setMissionState);
 
   useDrivingFeedback(); // Activate Feedback Logic
 
+  const handleGoHome = () => {
+    setIsPaused(false);
+    setMisssionState('idle');
+    setScreen('home');
+  }
 
   // クリックした時の動作（ボタンの上でクリックした時は反応しないようにする工夫付き）
   const handleGlobalClick = (e: React.MouseEvent) => {
@@ -121,7 +128,9 @@ export default function ClientApp() {
     if ((e.target as HTMLElement).closest('button')) {
       return;
     }
-    if (screen === 'driving'){setIsPaused(!isPaused);}
+    if (screen === 'driving'){
+      setIsPaused(!isPaused);
+    }
   };
 
   return (
@@ -137,8 +146,8 @@ export default function ClientApp() {
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
               backgroundColor: 'rgba(0, 0, 0, 0.6)', 
               zIndex: 999, 
-              display: 'flex', justifyContent: 'center', alignItems: 'center',
-              pointerEvents: 'none', 
+              display: 'flex', flexDirection:'column', justifyContent: 'center', alignItems: 'center', gap:'20px',
+              // pointerEvents: 'none', 
             }}>
               <h1 style={{ 
                 color: 'white', fontSize: '80px', fontWeight: 'bold', letterSpacing: '10px',
@@ -146,6 +155,26 @@ export default function ClientApp() {
               }}>
                 PAUSED ⏸
               </h1>
+              <p style={{color: '#94a3b8', fontSize: '18px'}}>画面をクリックして再開</p>
+              <div style={{display: 'flex', gap:'20px', marginTop:'20px'}}>
+                 <button
+                  onClick={handleGoHome}
+                  style={{
+                    padding: '16px 32px',
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    backgroundColor: '#dc2626',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+                    transition: 'background 0.2s',
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#b91c1c'}
+                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                >ホームへ戻る</button>
+              </div>
             </div>
           )}
           

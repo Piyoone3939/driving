@@ -32,12 +32,12 @@ export function GarageScene() {
                 
                 <Suspense fallback={null}>
                      {/* Car Model (Rotating) */}
-                     <group position={[0, -0.5, 0]} rotation={[0, -0.5, 0]}>
+                     <group position={[0, 0, 0]} rotation={[0, -0.5, 0]}>
                          <RotatingCar />
                      </group>
 
-                     <ContactShadows position={[0, -0.1, 0]} opacity={0.6} scale={10} blur={2} far={4} color="#000000" />
-                     <gridHelper args={[20, 20, 0x444444, 0x222222]} position={[0, -0.05, 0]} />
+                     <ContactShadows position={[0, 0.01, 0]} opacity={0.6} scale={10} blur={2} far={4} color="#000000" />
+                     <gridHelper args={[20, 20, 0x444444, 0x222222]} position={[0, 0, 0]} />
                 </Suspense>
             </Canvas>
         </div>

@@ -33,13 +33,14 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
     const acceleration = 0.01;
     const friction = 0.005;
     const turnSpeed = 0.05; 
-    const creepSpeed = 0.05;
+    const creepSpeed = 0.15; // Increased from 0.05 per user request
 
     // Recording state
     const recordedFrames = useRef<ReplayFrame[]>([]);
     
     // Replay state
     const replayIndex = useRef(0);
+    const ghostDist = useRef(0); // Track ghost car distance independently
 
     // Checkpoint Logic
     const clearedCheckpoints = useRef<Set<string>>(new Set());
@@ -72,11 +73,29 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
                 groupRef.current.position.set(frame.position[0], frame.position[1], frame.position[2]);
                 groupRef.current.rotation.set(frame.rotation[0], frame.rotation[1], frame.rotation[2]);
                 
+                
                 // Update Ghost Car (Ideal Path)
                 if (ghostRef.current) {
-                    const targetSpeed = 0.25; 
-                    const dist = Math.min((replayIndex.current * targetSpeed), courseLength);
-                    const t = dist / courseLength;
+                    // Variable Speed Logic
+                    let targetSpeed = 0.25; // Default ~55km/h
+                    
+                    // Slow down for turns
+                    if (currentLesson === 'left-turn' || currentLesson === 'right-turn') {
+                        // Turn is roughly from 50m to 65m
+                        if (ghostDist.current > 45 && ghostDist.current < 70) {
+                            targetSpeed = 0.1; // Slow down to ~20km/h
+                        }
+                    } else if (currentLesson === 's-curve' || currentLesson === 'crank') {
+                        targetSpeed = 0.08; // Always slow for complex courses
+                    }
+
+                    ghostDist.current += targetSpeed;
+                    if (ghostDist.current > courseLength) {
+                        // Clamp or just stay at end? 
+                        // If loop, we reset.
+                    }
+
+                    const t = Math.min(ghostDist.current / courseLength, 1);
                     
                     if (t <= 1) {
                         const point = coursePath.getPointAt(t);
@@ -133,6 +152,7 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
                 replayIndex.current++;
             } else {
                 replayIndex.current = 0; // Loop
+                ghostDist.current = 0;
             }
             return;
         }
@@ -158,7 +178,11 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
 
         // 2. Steering
         if (Math.abs(speed.current) > 0.001) {
-             const boostedSteering = steeringInput * 2.0;
+             // Non-linear steering curve: Gentle at center, strong at limits
+             const curvePower = 1.8;
+             const curvedInput = Math.sign(steeringInput) * Math.pow(Math.abs(steeringInput), curvePower);
+             
+             const boostedSteering = curvedInput * 8.0; // Boosted to 8.0 per user request (maximum turning)
              groupRef.current.rotation.y -= boostedSteering * turnSpeed * (speed.current / maxSpeed) * 3.0;
         }
 
@@ -169,64 +193,17 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
         
         // CHECK GOAL
         if (checkMissionGoal(currentLesson, groupRef.current.position)) {
-             useDrivingStore.setState({ replayData: recordedFrames.current });
-             setMissionState('success');
+             // Save Replay Data
+             const frames = recordedFrames.current;
+             useDrivingStore.setState({ replayData: frames });
+
+             setMissionState('success'); // Triggers GoalEffects (if any)
              setScreen('feedback'); 
              return;
         }
 
-        // --- ROUTE DEVIATION CHECK (New) ---
-        // Find closest point on course path to car
-        // Optimization: We could use t from ghost car but that might be ahead/behind.
-        // Let's do a simple scan or geometric projection. For MVP, simple search.
-        const carPos = groupRef.current.position;
-        // Search resolution: 100 steps? Or just project?
-        // Basic: Loop points? No, too slow.
-        // CurvePath usually has .getPointAt(u).
-        // Let's rely on stored t? No.
-        // Let's find min distance by sampling. 
-        // Better: Project point on segment.
-        // Given we know the course structure (lines + curves), ideal is math.
-        // But getCoursePath returns a CurvePath.
-        // Fallback: check distance to ghost car? No, ghost car moves at constant speed.
-        // User might be slow but on track.
-        
-        // Let's calculate distance to "nearest point on path".
-        // Since we are in 3D lib, maybe THREE has something? No.
-        
-        // Approx: Iterate checkpoints? No.
-        // Let's sample the curve at 100 points and find min?
-        // Course length is ~50-200m. 
-        // 1m resolution = 200 checks. Feasible in useFrame? Maybe.
-        
-        let minDistance = 1000;
-        const resolution = 50; // Check 50 points along the path
-        for(let i=0; i<=resolution; i++) {
-            const point = coursePath.getPointAt(i/resolution);
-            const dist = new Vector3(point.x, point.y, point.z).distanceTo(carPos);
-            if(dist < minDistance) minDistance = dist;
-        }
 
-        // Thresholds
-        const WARNING_DIST = 2.0; // 2m deviation starts warning?
-        const PENALTY_DIST = 2.5; 
-        
-        const isNowOffTrack = minDistance > PENALTY_DIST;
-        
-        // Update State
-        if (isNowOffTrack !== useDrivingStore.getState().isOffTrack) {
-             useDrivingStore.getState().setOffTrack(isNowOffTrack);
-        }
 
-        // Apply Penalty
-        if (isNowOffTrack && Math.abs(speed.current) > 0.01) {
-            // Penalty proportional to deviation usage? Or fixed per frame?
-            // Let's do fixed per frame to simulate "time spent off track"
-            // 0.05 points per frame (60fps) -> 3 points per second off track.
-            // Plus bonus based on how far?
-            const penalty = 0.05 + (minDistance - PENALTY_DIST) * 0.01;
-            useDrivingStore.getState().addDeviationPenalty(penalty);
-        }
 
 
         // CHECK INTERMEDIATE CHECKPOINTS
@@ -266,6 +243,7 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
             position: groupRef.current.position.toArray() as [number, number, number],
             rotation: groupRef.current.rotation.toArray() as [number, number, number],
             steering: steeringInput,
+            speed: Math.abs(speed.current) * 100, // Record speed for analysis
             headRotation: { ...headRotation } 
         });
 

@@ -178,6 +178,7 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
 
   // ■ isPaused の変化に合わせてカメラをON/OFFする
   useEffect(() => {
+    
     // MediaPipeのロードが終わっていない場合は無視（ロード完了時の処理に任せる）
     if (!faceLandmarkerRef.current) return;
 
@@ -212,13 +213,13 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         return; 
     }
 
-    if (faceLandmarkerRef.current && handLandmarkerRef.current && poseLandmarkerRef.current && video.currentTime !== lastVideoTimeRef.current) {
-        // eslint-disable-next-line react-hooks/purity
+    if (faceLandmarkerRef.current && handLandmarkerRef.current && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0 && video.currentTime !== lastVideoTimeRef.current) {
+      // eslint-disable-next-line react-hooks/purity
         const startTimeMs = performance.now();
-        // eslint-disable-next-line react-hooks/purity
-        const currentTime = performance.now();
-        const deltaTime = lastFrameTimeRef.current === 0 ? 16 : currentTime - lastFrameTimeRef.current;
-        lastFrameTimeRef.current = currentTime;
+         
+        const deltaTime = lastFrameTimeRef.current === 0 ? 16 : startTimeMs - lastFrameTimeRef.current;
+        lastFrameTimeRef.current = startTimeMs;
+        lastVideoTimeRef.current = video.currentTime;
 
         try {
             const drawingUtils = ctx ? new DrawingUtils(ctx) : null;
@@ -239,6 +240,22 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
                     const midEarX = (leftEar.x + rightEar.x) / 2;
                     const yawEstimate = (nose.x - midEarX) * 20;
                     setHeadRotation({ pitch: 0, yaw: -yawEstimate, roll: 0 });
+
+                    // Gaze Calculation
+                    const leftInner = landmarks[33].x;
+                    const leftOuter = landmarks[133].x;
+                    const leftIris = landmarks[468].x;
+                    
+                    const rightInner = landmarks[362].x;
+                    const rightOuter = landmarks[263].x;
+                    const rightIris = landmarks[473].x;
+                    
+                    const leftRatio = (leftIris - leftInner) / (leftOuter - leftInner);
+                    const rightRatio = (rightIris - rightInner) / (rightOuter - rightInner);
+                    
+                    const avgRatio = (leftRatio + rightRatio) / 2;
+                    const gazeX = (avgRatio - 0.5) * 5; 
+                    setGaze({ x: gazeX, y: 0 });
                 }
             }
 
@@ -250,12 +267,15 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
                     drawingUtils.drawLandmarks(landmarks, {color: "#FF0000", lineWidth: 2});
                 }
             }
-            const handInfo = processHandGestures(handResult, setSteering);
+            const handInfo = processHandGestures(handResult, setSteering, setPedals, setDebugInfo);
 
             // Run Pose Detection for Foot Pedal Recognition
-            const poseResult = poseLandmarkerRef.current.detectForVideo(video, startTimeMs);
-            processPoseForPedals(poseResult, deltaTime, drawingUtils, handInfo);
-
+            const poseResult = poseLandmarkerRef.current 
+                ? poseLandmarkerRef.current.detectForVideo(video, startTimeMs) 
+                : null;
+            if (poseResult) {
+                processPoseForPedals(poseResult, deltaTime, drawingUtils, handInfo);
+            }
         } catch (e) {
             console.error(e);
         }
@@ -265,14 +285,14 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
     requestRef.current = requestAnimationFrame(predictWebcam);
   };
 
-  const processHandGestures = (result: HandLandmarkerResult, setSteering: (val: number) => void): string => {
+
+  const processHandGestures = (result: HandLandmarkerResult, setSteering: any, setPedals: any, setDebugInfo: any) => {
       const hands = result.landmarks.length;
       let info = `Hands: ${hands}`;
 
       if (hands === 2 && result.handedness.length === 2) {
           let leftHandLandmarks = result.landmarks[0];
           let rightHandLandmarks = result.landmarks[1];
-
           const label0 = result.handedness[0]?.[0]?.categoryName ?? 'Left';
           const label1 = result.handedness[1]?.[0]?.categoryName ?? 'Right';
 
@@ -296,25 +316,45 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
               }
           }
 
-          const left = leftHandLandmarks[9];
+          const left = leftHandLandmarks[9]; 
           const right = rightHandLandmarks[9];
-
+          
           const dy = right.y - left.y;
           const dx = right.x - left.x;
-
+          
           const angle = Math.atan2(dy, dx);
-
-          // Digital Steering Logic: Snap to 1 or -1
-          const threshold = 0.1;
+          
+          // Analog Steering Logic
+          // Angle is in radians. 
+          // 0 is Center.
+          // Left Turn (CCW) -> Negative Angle.
+          // Right Turn (CW) -> Positive Angle.
+          
+          // Sensitivity Factor: 
+          // 90 degrees (PI/2 = 1.57) should be full lock? 
+          // Or 45 degrees (0.78)?
+          // Let's try aiming for ~60 degrees for full lock.
+          // 1.0 / (PI/3) ~= 1.0.
+          // Let's try multiplier 1.5. 
+          // If angle is -0.7 (40 deg), steering = 1.05 (Full).
+          
+          // Based on previous code `steering = -Math.sign(angle)`, 
+          // we maintain the negative sign relationship.
+          
+          const sensitivity = 0.8; // Lower sensitivity for smoother analog feel (Full lock at ~70 deg)
+          const deadzone = 0.05;
           let steering = 0;
-          if (Math.abs(angle) > threshold) {
-              // Invert sign as requested
-              steering = -Math.sign(angle);
+          
+          if (Math.abs(angle) > deadzone) {
+              steering = -angle * sensitivity;
           }
-
+          
+          // Clamp to -1 to 1
+          steering = Math.max(-1, Math.min(1, steering));
+          
           setSteering(steering);
-
-          info += ` | Str: ${steering}`;
+          
+          info += ` | Ang: ${angle.toFixed(2)} | Str: ${steering.toFixed(2)}`;
       } else {
           setSteering(0);
           info += " | Need 2 hands";
