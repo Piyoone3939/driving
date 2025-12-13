@@ -15,32 +15,43 @@ export function MissionController() {
 }
 
 // Goal Definitions (Position, Rotation Y, Size)
-export const MISSION_GOALS: Record<string, { position: [number, number, number], size: [number, number, number], rotation: number }> = {
-    'straight': {
-        position: [0, 0, -150],
-        size: [10, 5, 5],
-        rotation: 0
-    },
-    'left-turn': {
-        position: [-30, 0, -38], // Located on the exit road (-X) after turn
-        size: [10, 5, 5],
-        rotation: Math.PI / 2 // Rotated 90 deg to face the road traveling along -X
-    },
-    'right-turn': {
-        position: [30, 0, -38], // Located on the exit road (+X) after turn
-        size: [10, 5, 5],
-        rotation: -Math.PI / 2 // Rotated -90 deg to face the road traveling along +X
-    },
-    's-curve': {
-        position: [0, 0, -100],
-        size: [10, 5, 5],
-        rotation: 0
-    },
-    'crank': {
-        position: [0, 0, -100],
-        size: [10, 5, 5],
-        rotation: 0
-    },
+export const MISSION_GOALS: Record<
+  string,
+  { position: [number, number, number]; size: [number, number, number]; rotation: number }
+> = {
+  straight: {
+    position: [0, 0, -150],
+    size: [10, 5, 5],
+    rotation: 0,
+  },
+
+  "left-turn": {
+    // getCoursePath(): exit は z=-38 のまま x=-8 → -60 なので -30 はOK
+    position: [-30, 0, -38],
+    size: [10, 5, 5],
+    rotation: Math.PI / 2,
+  },
+
+  "right-turn": {
+    // getCoursePath(): exit は z=-38 のまま x=8 → 60 なので 30 はOK
+    position: [30, 0, -38],
+    size: [10, 5, 5],
+    rotation: -Math.PI / 2,
+  },
+
+  "s-curve": {
+    // getCoursePath(): 終点が (0,0,-120) なのでゴールもそこへ
+    position: [0, 0, -120],
+    size: [10, 5, 5],
+    rotation: 0,
+  },
+
+  crank: {
+    // getCoursePath(): 最後は xL=-8 の直進で ( -8,0,-100 ) が終点
+    position: [-8, 0, -100],
+    size: [10, 5, 5],
+    rotation: 0,
+  },
 };
 
 // Checkpoints (Stop Signs, Mirrors)
