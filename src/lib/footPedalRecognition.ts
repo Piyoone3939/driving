@@ -61,7 +61,6 @@
  */
 
 import { NormalizedLandmark } from "@mediapipe/tasks-vision";
-import { convertSegmentPathToStaticExportFilename } from "next/dist/shared/lib/segment-cache/segment-value-encoding";
 
 /**
  * 足の初期位置と角度を保存する型
@@ -101,6 +100,12 @@ export interface FootCalibration {
   // 安定性チェック用（5秒間の位置確認）
   stabilityCheckStartTime: number | null;
   stabilityCheckPosition: { x: number; y: number; z: number } | null;
+
+  // 平滑化用（前回の値を保存）
+  smoothedKneeAngle: number | null;
+  smoothedFootAngle: number | null;
+  smoothedHipCenter: { x: number; y: number; z: number } | null;
+  smoothedRightKnee: { x: number; y: number; z: number } | null;
 }
 
 /**
@@ -236,6 +241,10 @@ export function calibrateFootPosition(
     isCalibrated: false, // 安定性チェック前はfalse
     stabilityCheckStartTime: null,
     stabilityCheckPosition: null,
+    smoothedKneeAngle: null, // 平滑化用の初期値
+    smoothedFootAngle: null,
+    smoothedHipCenter: null,
+    smoothedRightKnee: null,
   };
 }
 
@@ -353,8 +362,8 @@ export function recognizeAcceleration(
   const POSITION_THRESHOLD = 0.03; // 基準位置と判定する閾値（余裕を持たせて安定化）
   const ACCEL_MOVE_THRESHOLD = 0.01; // アクセル踏み込みと判定する閾値（体の中心から右側へ）
   const ACCEL_RETURN_THRESHOLD = 0.02; // アクセルから戻る際の閾値（ヒステリシス）
-  const ANGLE_SENSITIVITY = 3.5; // 角度の感度
-  const KNEE_ANGLE_THRESHOLD = 0.10; // 腰-膝角度の閾値（ラジアン、約5.8度）
+  const ANGLE_SENSITIVITY = 7.0; // 角度の感度
+  const KNEE_ANGLE_THRESHOLD = 0.25; // 腰-膝角度の閾値（ラジアン、約5.8度）
 
   let isAccelPressed = false;
   let throttle = 0;
@@ -494,12 +503,12 @@ export function recognizeBraking(
   const angleDiff = Math.abs(currentHipToKneeAngle - calibration.hipToRightKneeAngle);
 
   // ブレーキと判定する角度の閾値
-  const BRAKE_ANGLE_THRESHOLD = 1.0; // ラジアン（約5.8度）の範囲内であればブレーキと判定
+  const BRAKE_ANGLE_THRESHOLD = 1.2; // ラジアン（約5.8度）の範囲内であればブレーキと判定
 
   // 足先の現在の角度（ブレーキの強弱判定用）
   const currentFootAngle = calculateFootAngle(rightAnkle, rightFootIndex);
   const footAngleDiff = currentFootAngle - calibration.rightFootAngle;
-  const MAX_BRAKE_FOOT_ANGLE = 0.3;
+  const MAX_BRAKE_FOOT_ANGLE = 0.4;
 
   let isBrakePressed = false;
   let brake = 0;
@@ -517,7 +526,7 @@ export function recognizeBraking(
     brakePressDuration += deltaTime;
     
     // シンプルなブレーキ強度計算
-    brake = Math.max(0, Math.min(angleBasedBrake, 1.0)) * 1.0; // 最大100%の制動力
+    brake = Math.max(0, Math.min(angleBasedBrake, 1.0)) * 1.5; // 最大100%の制動力
 
   } else {
     // ブレーキを離した
@@ -534,7 +543,7 @@ export function recognizeBraking(
 }
 
 /**
- * 足元のペダル操作を総合的に処理する（改善版）
+ * 足元のペダル操作を総合的に処理する（改善版 + 平滑化対応）
  */
 export function processPedalRecognition(
   landmarks: NormalizedLandmark[],
@@ -542,14 +551,100 @@ export function processPedalRecognition(
   previousState: PedalState,
   deltaTime: number
 ): { pedalState: PedalState; updatedCalibration: FootCalibration } {
-  // アクセル認識（キャリブレーション更新あり）
-  const accelResult = recognizeAcceleration(landmarks, calibration, previousState);
+  if (!calibration.isCalibrated || landmarks.length < 33) {
+    return {
+      pedalState: {
+        throttle: 0,
+        brake: 0,
+        isAccelPressed: false,
+        isBrakePressed: false,
+        brakePressDuration: 0,
+        brakePressCount: 0,
+      },
+      updatedCalibration: calibration,
+    };
+  }
+
+  // 平滑化パラメータ（指数移動平均）
+  const SMOOTHING_ALPHA = 0.3; // 0に近いほど滑らか、1に近いほど反応が早い
+
+  const leftHip = landmarks[POSE_LANDMARKS.LEFT_HIP];
+  const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
+  const rightKnee = landmarks[POSE_LANDMARKS.RIGHT_KNEE];
+
+  // 現在の腰の中点を計算
+  const rawHipCenter = {
+    x: (leftHip.x + rightHip.x) / 2,
+    y: (leftHip.y + rightHip.y) / 2,
+    z: (leftHip.z + rightHip.z) / 2,
+  };
+
+  // 現在の右膝の座標
+  const rawRightKnee = { x: rightKnee.x, y: rightKnee.y, z: rightKnee.z };
+
+  // 平滑化: 腰の中点
+  let smoothedHipCenter: { x: number; y: number; z: number };
+  if (calibration.smoothedHipCenter === null) {
+    smoothedHipCenter = rawHipCenter;
+  } else {
+    smoothedHipCenter = {
+      x: SMOOTHING_ALPHA * rawHipCenter.x + (1 - SMOOTHING_ALPHA) * calibration.smoothedHipCenter.x,
+      y: SMOOTHING_ALPHA * rawHipCenter.y + (1 - SMOOTHING_ALPHA) * calibration.smoothedHipCenter.y,
+      z: SMOOTHING_ALPHA * rawHipCenter.z + (1 - SMOOTHING_ALPHA) * calibration.smoothedHipCenter.z,
+    };
+  }
+
+  // 平滑化: 右膝の座標
+  let smoothedRightKnee: { x: number; y: number; z: number };
+  if (calibration.smoothedRightKnee === null) {
+    smoothedRightKnee = rawRightKnee;
+  } else {
+    smoothedRightKnee = {
+      x: SMOOTHING_ALPHA * rawRightKnee.x + (1 - SMOOTHING_ALPHA) * calibration.smoothedRightKnee.x,
+      y: SMOOTHING_ALPHA * rawRightKnee.y + (1 - SMOOTHING_ALPHA) * calibration.smoothedRightKnee.y,
+      z: SMOOTHING_ALPHA * rawRightKnee.z + (1 - SMOOTHING_ALPHA) * calibration.smoothedRightKnee.z,
+    };
+  }
+
+  // 平滑化した座標を使って角度を計算
+  const kneeOffsetX = smoothedRightKnee.x - smoothedHipCenter.x;
+  const kneeOffsetY = Math.abs(smoothedRightKnee.y - smoothedHipCenter.y);
+  const currentKneeAngle = Math.atan2(kneeOffsetX, kneeOffsetY);
+
+  // キャリブレーション時の角度
+  const calibKneeOffsetX = calibration.rightKnee.x - calibration.hipCenter.x;
+  const calibKneeOffsetY = Math.abs(calibration.rightKnee.y - calibration.hipCenter.y);
+  const calibKneeAngle = Math.atan2(calibKneeOffsetX, calibKneeOffsetY);
+
+  // 角度の差分（生の値）
+  const rawKneeAngleDiff = currentKneeAngle - calibKneeAngle;
+
+  // 角度も平滑化
+  let smoothedKneeAngleDiff: number;
+  if (calibration.smoothedKneeAngle === null) {
+    smoothedKneeAngleDiff = rawKneeAngleDiff;
+  } else {
+    smoothedKneeAngleDiff = SMOOTHING_ALPHA * rawKneeAngleDiff + (1 - SMOOTHING_ALPHA) * calibration.smoothedKneeAngle;
+  }
+
+  // 平滑化した値をキャリブレーションに保存
+  const smoothedCalibration = {
+    ...calibration,
+    smoothedHipCenter,
+    smoothedRightKnee,
+    smoothedKneeAngle: smoothedKneeAngleDiff,
+  };
+
+  console.log("kneeAngleDiff (raw/smoothed)", rawKneeAngleDiff.toFixed(3), "/", smoothedKneeAngleDiff.toFixed(3));
+
+  // アクセル認識（平滑化済みのキャリブレーションを使用）
+  const accelResult = recognizeAcceleration(landmarks, smoothedCalibration, previousState);
 
   // ブレーキ認識（更新されたキャリブレーションを使用）
   const brakeResult = recognizeBraking(landmarks, accelResult.updatedCalibration, previousState, deltaTime);
 
   // アクセルとブレーキの排他制御（同時に踏まない）
-  let throttle = accelResult.throttle;
+  const throttle = accelResult.throttle;
   let brake = brakeResult.brake;
   let isBrakePressed = brakeResult.isBrakePressed;
 
