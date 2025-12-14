@@ -11,9 +11,14 @@ import { useDrivingFeedback } from '@/hooks/useDrivingFeedback';
 import { AuthScreen } from '@/components/auth/AuthScreen';
 import { HistoryScreen } from '@/components/ui/HistoryScreen';
 import { auth } from '@/lib/firebase';
+import { TutorialScreen } from '@/components/ui/TutorialScreen';
 
 const VisionController = dynamic(() => import('@/components/vision/VisionController'), { ssr: false });
 const Scene = dynamic(() => import('@/components/simulation/Scene').then(mod => mod.Scene), { ssr: false });
+
+// ... (existing imports)
+
+
 
 function UserProfileHeader() {
     const user = useDrivingStore(state => state.user);
@@ -233,6 +238,7 @@ export default function ClientApp() {
           {screen === 'auth' && <AuthScreen />}
           {screen === 'history' && <HistoryScreen />}
 
+          {screen === 'tutorial' && <TutorialScreen />}
           {screen === 'driving' && (
               <>
                 <VisionController isPaused={isPaused} />

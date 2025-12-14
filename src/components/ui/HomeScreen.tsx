@@ -2,6 +2,7 @@ import { useDrivingStore } from "@/lib/store";
 import { GarageScene } from "../simulation/GarageScene";
 
 const LESSONS = [
+  { id: "tutorial", label: "チュートリアル", sub: "BASIC", desc: "LEARN CONTROLS", icon: "TUTORIAL" },
   { id: "straight", label: "直線走行", sub: "LEVEL 01", desc: "BASIC CONTROL", icon: "START" },
   { id: "left-turn", label: "左折", sub: "LEVEL 02", desc: "TURNING LEFT", icon: "LEFT" },
   { id: "right-turn", label: "右折", sub: "LEVEL 03", desc: "TURNING RIGHT", icon: "RIGHT" },
@@ -17,6 +18,13 @@ export function HomeScreen() {
   const setMissionState = useDrivingStore((state) => state.setMissionState);
 
   const handleSelectLesson = (lessonId: (typeof LESSONS)[number]["id"]) => {
+    // チュートリアルは特別扱い
+    if (lessonId === "tutorial") {
+        setScreen("tutorial");
+        return;
+    }
+
+    // @ts-ignore
     setLesson(lessonId);
 
     // free-mode はブリーフィング/ゴール判定なしで即運転

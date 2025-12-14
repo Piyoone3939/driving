@@ -36,7 +36,7 @@ export type LessonId =
   | "left-turn"
   | "right-turn";
 
-export type ScreenId = "home" | "driving" | "feedback" | "auth" | "history";
+export type ScreenId = "home" | "driving" | "feedback" | "auth" | "history" | "tutorial";
 export type MissionState = "idle" | "briefing" | "active" | "success" | "failed";
 
 export interface DrivingState {
