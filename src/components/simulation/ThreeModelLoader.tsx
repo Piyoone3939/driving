@@ -1,9 +1,10 @@
 "use client";
 
 import { useGLTF } from "@react-three/drei";
+import { ThreeElements } from "@react-three/fiber";
 import { Euler } from "three";
 
-type ThreeModelLoaderProps = GroupProps & {
+type ThreeModelLoaderProps = ThreeElements["group"] & {
   /** 読み込む glTF / glb モデルのパス */
   url: string;
   scale?: number | [number, number, number];
@@ -19,11 +20,8 @@ export function ThreeModelLoader({
   const { scene } = useGLTF(url);
 
   return (
-    <primitive
-      object={scene}
-      scale={scale}
-      rotation={rotation}
-      {...props}
-    />
+    <group scale={scale} rotation={rotation} {...props}>
+      <primitive object={scene} />
+    </group>
   );
 }
