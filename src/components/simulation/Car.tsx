@@ -12,11 +12,11 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
     const ghostRef = useRef<Group>(null); // Ref for Ghost Car
     const { camera } = useThree();
 
-    const { 
-        steeringAngle: steeringInput, 
-        throttle: throttleInput, 
-        brake: brakeInput, 
-        headRotation, 
+    const {
+        steeringAngle: steeringInput,
+        throttle: throttleInput,
+        brake: brakeInput,
+        headRotation,
         setSpeed,
         isPaused,
         isReplaying,
@@ -29,15 +29,15 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
 
     // Physics state
     const speed = useRef(0);
-    const maxSpeed = 1.5; 
+    const maxSpeed = 1.5;
     const acceleration = 0.01;
     const friction = 0.005;
-    const turnSpeed = 0.05; 
+    const turnSpeed = 0.05;
     const creepSpeed = 0.15; // Increased from 0.05 per user request
 
     // Recording state
     const recordedFrames = useRef<ReplayFrame[]>([]);
-    
+
     // Replay state
     const replayIndex = useRef(0);
     const ghostDist = useRef(0); // Track ghost car distance independently
@@ -68,17 +68,16 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
 
             if (replayIndex.current < replayData.length) {
                 const frame = replayData[replayIndex.current];
-                
+
                 // Update Player Car
                 groupRef.current.position.set(frame.position[0], frame.position[1], frame.position[2]);
                 groupRef.current.rotation.set(frame.rotation[0], frame.rotation[1], frame.rotation[2]);
-                
-                
+
                 // Update Ghost Car (Ideal Path)
                 if (ghostRef.current) {
                     // Variable Speed Logic
                     let targetSpeed = 0.25; // Default ~55km/h
-                    
+
                     // Slow down for turns
                     if (currentLesson === 'left-turn' || currentLesson === 'right-turn') {
                         // Turn is roughly from 50m to 65m
@@ -91,17 +90,17 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
 
                     ghostDist.current += targetSpeed;
                     if (ghostDist.current > courseLength) {
-                        // Clamp or just stay at end? 
+                        // Clamp or just stay at end?
                         // If loop, we reset.
                     }
 
                     const t = Math.min(ghostDist.current / courseLength, 1);
-                    
+
                     if (t <= 1) {
                         const point = coursePath.getPointAt(t);
                         const tangent = coursePath.getTangentAt(t);
                         ghostRef.current.position.set(point.x, point.y, point.z);
-                        ghostRef.current.rotation.set(0, Math.atan2(tangent.x, tangent.z) + Math.PI, 0); 
+                        ghostRef.current.rotation.set(0, Math.atan2(tangent.x, tangent.z) + Math.PI, 0);
                     }
                 }
 
@@ -109,12 +108,12 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
                 if (replayViewMode === 'driver') {
                     // First Person (Driver View)
                     const targetGroup = cameraTarget === 'ghost' ? ghostRef.current : groupRef.current;
-                    
+
                     if (targetGroup) {
-                        const camOffset = new Vector3(0.35, 1.28, 0.4); 
+                        const camOffset = new Vector3(0.35, 1.28, 0.4);
                         camOffset.applyEuler(targetGroup.rotation);
                         const camPos = targetGroup.position.clone().add(camOffset);
-                        
+
                         camera.position.lerp(camPos, 0.5);
 
                         let baseLookTarget;
@@ -129,7 +128,7 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
                             const forward = new Vector3(0, 0, -1);
                             forward.applyEuler(targetGroup.rotation);
                             baseLookTarget = targetGroup.position.clone().add(forward.multiplyScalar(10));
-                            
+
                             const right = new Vector3(1, 0, 0).applyEuler(targetGroup.rotation);
                             baseLookTarget.add(right.multiplyScalar(recordedHead.yaw * 5));
                             baseLookTarget.y += recordedHead.pitch * 5;
@@ -140,11 +139,11 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
 
                 } else {
                     // Third Person (Chase Cam)
-                    const targetGroup = groupRef.current; 
-                    const camOffset = new Vector3(0, 5, 10); 
-                    camOffset.applyEuler(targetGroup.rotation); 
+                    const targetGroup = groupRef.current;
+                    const camOffset = new Vector3(0, 5, 10);
+                    camOffset.applyEuler(targetGroup.rotation);
                     const camPos = targetGroup.position.clone().add(new Vector3(0, 4, 8).applyEuler(targetGroup.rotation));
-                    
+
                     camera.position.lerp(camPos, 0.1);
                     camera.lookAt(targetGroup.position);
                 }
@@ -167,7 +166,7 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
             if (speed.current < 0) speed.current = 0;
         } else {
             if (speed.current < creepSpeed) {
-                speed.current += 0.001; 
+                speed.current += 0.001;
             } else {
                 speed.current -= friction;
                 if (speed.current < creepSpeed) speed.current = creepSpeed;
@@ -181,7 +180,7 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
              // Non-linear steering curve: Gentle at center, strong at limits
              const curvePower = 1.8;
              const curvedInput = Math.sign(steeringInput) * Math.pow(Math.abs(steeringInput), curvePower);
-             
+
              const boostedSteering = curvedInput * 8.0; // Boosted to 8.0 per user request (maximum turning)
              groupRef.current.rotation.y -= boostedSteering * turnSpeed * (speed.current / maxSpeed) * 3.0;
         }
@@ -190,7 +189,7 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
         const forward = new Vector3(0, 0, -1);
         forward.applyEuler(groupRef.current.rotation);
         groupRef.current.position.add(forward.multiplyScalar(speed.current));
-        
+
         // CHECK GOAL
         if (checkMissionGoal(currentLesson, groupRef.current.position)) {
              // Save Replay Data
@@ -198,7 +197,7 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
              useDrivingStore.setState({ replayData: frames });
 
              setMissionState('success'); // Triggers GoalEffects (if any)
-             setScreen('feedback'); 
+             setScreen('feedback');
              return;
         }
 
@@ -207,9 +206,9 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
 
 
         // CHECK INTERMEDIATE CHECKPOINTS
-        const checkpoints = dataCheckpoints.current; 
+        const checkpoints = dataCheckpoints.current;
         checkpoints.forEach(cp => {
-            if (clearedCheckpoints.current.has(cp.id)) return; 
+            if (clearedCheckpoints.current.has(cp.id)) return;
 
             const dx = groupRef.current!.position.x - cp.position[0];
             const dz = groupRef.current!.position.z - cp.position[2];
@@ -244,14 +243,14 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
             rotation: groupRef.current.rotation.toArray() as [number, number, number],
             steering: steeringInput,
             speed: Math.abs(speed.current) * 100, // Record speed for analysis
-            headRotation: { ...headRotation } 
+            headRotation: { ...headRotation }
         });
 
         // 5. Camera (First Person)
-        const camOffset = new Vector3(0.35, 1.28, 0.4); 
+        const camOffset = new Vector3(0.35, 1.28, 0.4);
         camOffset.applyEuler(groupRef.current.rotation);
         const camPos = groupRef.current.position.clone().add(camOffset);
-        
+
         camera.position.lerp(camPos, 0.5);
 
         // Head Rotation
@@ -265,12 +264,12 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
     });
 
     const showDriverView = !isReplaying || (isReplaying && replayViewMode === 'driver');
-    
+
     return (
         <>
             {/* Player Car */}
             <group ref={groupRef} position={[0, 0, 0]}>
-                {showDriverView ? 
+                {showDriverView ?
                     (
                          <group rotation={[0, Math.PI, 0]}>
                             <ExternalCarVisuals hideCabin />
@@ -281,7 +280,7 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
                         </group>
                     )
                 }
-                
+
                 {showDriverView && (
                    <CarVisuals steeringInput={steeringInput} />
                 )}
@@ -301,14 +300,14 @@ export function Car({ cameraTarget = 'player' }: { cameraTarget?: 'player' | 'gh
 
 export function CarVisuals({ steeringInput }: { steeringInput: number }) {
     return (
-        <group rotation={[0, Math.PI, 0]}> 
+        <group rotation={[0, Math.PI, 0]}>
           <mesh position={[0, 1.1, -0.25]} rotation={[0.35, 0, 0]}>
               <planeGeometry args={[1.8, 0.9]} />
               <meshStandardMaterial color="#aaddee" opacity={0.1} transparent roughness={0} metalness={0.9} />
           </mesh>
 
           {/* Steering Wheel */}
-          <group position={[0.35, 0.55, -0.35]} rotation={[-0.35, 0, 0]}> 
+          <group position={[0.35, 0.55, -0.35]} rotation={[-0.35, 0, 0]}>
               <group rotation={[0, 0, steeringInput * 2.5]}>
                   <mesh>
                       <torusGeometry args={[0.19, 0.02, 16, 48]} />
@@ -331,7 +330,7 @@ export function CarVisuals({ steeringInput }: { steeringInput: number }) {
                       <meshStandardMaterial color="#333" />
                   </mesh>
               </group>
-              
+
                <mesh position={[0, 0, -0.1]} rotation={[Math.PI/2, 0, 0]}>
                  <cylinderGeometry args={[0.04, 0.04, 0.2, 16]} />
                  <meshStandardMaterial color="#111" />
@@ -362,7 +361,7 @@ export function ExternalCarVisuals({ isGhost = false, hideCabin = false }: { isG
             <meshStandardMaterial color={cabinColor} metalness={0.1} roughness={0.1} transparent={transparent} opacity={opacity} />
           </mesh>
       )}
-      
+
       {/* Hood detail */}
       <mesh position={[0, 0.71, 1.2]} rotation={[0.1, 0, 0]}>
          <boxGeometry args={[1.5, 0.05, 1.4]} />
@@ -394,7 +393,7 @@ export function ExternalCarVisuals({ isGhost = false, hideCabin = false }: { isG
       <Wheel position={[0.8, 0.35, 1.2]} isGhost={isGhost} />
       <Wheel position={[-0.8, 0.35, -1.2]} isGhost={isGhost} />
       <Wheel position={[0.8, 0.35, -1.2]} isGhost={isGhost} />
-      
+
       {/* Underglow (Only real car) */}
       {!isGhost && (
           <pointLight position={[0, 0.1, 0]} color="#3b82f6" intensity={2} distance={5} decay={2} />
