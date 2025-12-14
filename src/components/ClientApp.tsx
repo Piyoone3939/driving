@@ -5,11 +5,10 @@ import KeyboardControls from '@/components/simulation/KeyboardControls';
 import { Dashboard } from '@/components/ui/Dashboard';
 import { HomeScreen } from '@/components/ui/HomeScreen';
 import { FeedbackScreen } from '@/components/ui/FeedbackScreen';
-import { LessonSelector } from '@/components/ui/LessonSelector';
 import dynamic from 'next/dynamic';
 import { Suspense, Component, ReactNode, useState } from 'react';
 import { useDrivingFeedback } from '@/hooks/useDrivingFeedback';
-import { AuthScreen } from '@/components/auth/AuthScreen'; 
+import { AuthScreen } from '@/components/auth/AuthScreen';
 import { HistoryScreen } from '@/components/ui/HistoryScreen';
 import { auth } from '@/lib/firebase';
 
@@ -26,7 +25,7 @@ function UserProfileHeader() {
     // 運転中やフィードバック画面では邪魔になる可能性があるので、HOMEのみ表示するなど調整可
     // 今回は常時表示しつつ、運転中は目立たなくする等の配慮も可能だが、
     // 要件通り右上に配置する。
-    if (screen === 'driving' || screen === 'feedback' || screen === 'auth' || screen === 'history') return null; 
+    if (screen === 'driving' || screen === 'feedback' || screen === 'auth' || screen === 'history') return null;
 
     const handleLogout = async () => {
         await auth.signOut();
@@ -40,7 +39,7 @@ function UserProfileHeader() {
             <div className="flex gap-3 text-xs font-mono">
                 {user ? (
                     <>
-                    <button 
+                    <button
                     onClick={() => setScreen('history')}
                     className='text-cyan-400 hover:text-cyan-300 transition-colors underline'
                     >Driving History</button>
@@ -62,7 +61,7 @@ function UserProfileHeader() {
                  </div>
     );
 }
-                
+
 
 class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean, error: string}> {
   constructor(props: {children: ReactNode}) {
@@ -133,8 +132,8 @@ function MissionOverlay() {
                 <p style={{ fontSize: '18px', lineHeight: '1.6', marginBottom: '40px', color: '#cbd5e1' }}>
                     {info.desc}
                 </p>
-                
-                <button 
+
+                <button
                     onClick={() => setMissionState('active')}
                     style={{
                         padding: '12px 40px',
@@ -186,8 +185,8 @@ export default function ClientApp() {
 
   return (
     <ErrorBoundary>
-        <div 
-            style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden', cursor: screen === 'driving' ? 'pointer' : 'default' }} 
+        <div
+            style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden', cursor: screen === 'driving' ? 'pointer' : 'default' }}
             onClick={handleGlobalClick}
         >
           <UserProfileHeader />
@@ -196,12 +195,12 @@ export default function ClientApp() {
           {screen === 'driving' && isPaused && (
             <div style={{
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-              backgroundColor: 'rgba(0, 0, 0, 0.6)', 
-              zIndex: 999, 
+              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+              zIndex: 999,
               display: 'flex', flexDirection:'column', justifyContent: 'center', alignItems: 'center', gap:'20px',
-              // pointerEvents: 'none', 
+              // pointerEvents: 'none',
             }}>
-              <h1 style={{ 
+              <h1 style={{
                 color: 'white', fontSize: '80px', fontWeight: 'bold', letterSpacing: '10px',
                 textShadow: '0 0 20px rgba(255,255,255,0.5)'
               }}>
@@ -229,7 +228,7 @@ export default function ClientApp() {
               </div>
             </div>
           )}
-          
+
           {screen === 'home' && <HomeScreen />}
           {screen === 'auth' && <AuthScreen />}
           {screen === 'history' && <HistoryScreen />}
@@ -238,7 +237,6 @@ export default function ClientApp() {
               <>
                 <VisionController isPaused={isPaused} />
                 <MissionOverlay />
-                <LessonSelector />
                 <KeyboardControls />
                 <Dashboard />
 
