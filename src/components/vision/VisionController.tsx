@@ -131,7 +131,7 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         const faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
           baseOptions: {
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
-            delegate: "GPU"
+            delegate: "CPU"
           },
           outputFaceBlendshapes: true,
           runningMode: "VIDEO",
@@ -141,7 +141,7 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         const handLandmarker = await HandLandmarker.createFromOptions(filesetResolver, {
           baseOptions: {
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
-            delegate: "GPU"
+            delegate: "CPU"
           },
           runningMode: "VIDEO",
           numHands: 2,
@@ -153,7 +153,7 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         poseLandmarkerRef.current = await PoseLandmarker.createFromOptions(filesetResolver, {
           baseOptions: {
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
-            delegate: "GPU"
+            delegate: "CPU"
           },
           runningMode: "VIDEO",
           numPoses: 1,
