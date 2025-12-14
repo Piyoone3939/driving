@@ -13,7 +13,7 @@ export function HomeScreen() {
   const setLesson = useDrivingStore(state => state.setLesson);
   const setScreen = useDrivingStore(state => state.setScreen);
   const setMissionState = useDrivingStore(state => state.setMissionState);
-  const currentLesson = useDrivingStore(state => state.currentLesson);
+  const user = useDrivingStore(state => state.user);
 
   const handleSelectLesson = (lessonId: (typeof LESSONS)[number]["id"]) => {
     setLesson(lessonId);
@@ -39,11 +39,6 @@ export function HomeScreen() {
                       VIRTUAL <span className="text-blue-500">DRIVING</span> SCHOOL
                   </h1>
                   <p className="text-sm font-bold text-slate-400 tracking-[0.3em] mt-2">SIMULATION SYSTEM v2.0</p>
-              </div>
-              <div className="flex gap-4">
-                  <div className="px-6 py-2 bg-slate-800/90 border-l-4 border-blue-500 rounded-r text-sm font-mono tracking-widest">
-                      PLAYER: GUEST
-                  </div>
               </div>
           </div>
 

@@ -4,6 +4,7 @@ import { Canvas } from "@react-three/fiber";
 import { Environment, OrbitControls, Sky } from "@react-three/drei";
 
 import { Car } from "./Car";
+
 import { Road } from "./Road";
 import { RoadProps } from "./RoadProps";
 import { Surroundings } from "./Surroundings";
@@ -27,6 +28,7 @@ export function Scene({ cameraTarget = 'player' }: { cameraTarget?: 'player' | '
             intensity={1}
           />
 
+          {/* GoalEffects removed */}
           <Car cameraTarget={cameraTarget} />
           <Road />
           <RoadProps />

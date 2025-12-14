@@ -8,9 +8,61 @@ import { FeedbackScreen } from '@/components/ui/FeedbackScreen';
 import { LessonSelector } from '@/components/ui/LessonSelector';
 import dynamic from 'next/dynamic';
 import { Suspense, Component, ReactNode, useState } from 'react';
+import { useDrivingFeedback } from '@/hooks/useDrivingFeedback';
+import { AuthScreen } from '@/components/auth/AuthScreen'; 
+import { HistoryScreen } from '@/components/ui/HistoryScreen';
+import { auth } from '@/lib/firebase';
 
 const VisionController = dynamic(() => import('@/components/vision/VisionController'), { ssr: false });
 const Scene = dynamic(() => import('@/components/simulation/Scene').then(mod => mod.Scene), { ssr: false });
+
+function UserProfileHeader() {
+    const user = useDrivingStore(state => state.user);
+    const setScreen = useDrivingStore(state => state.setScreen);
+    const setUser = useDrivingStore(state => state.setUser);
+    const setMissionHistory = useDrivingStore(state => state.setMissionHistory);
+    const screen = useDrivingStore(state => state.screen);
+
+    // 運転中やフィードバック画面では邪魔になる可能性があるので、HOMEのみ表示するなど調整可
+    // 今回は常時表示しつつ、運転中は目立たなくする等の配慮も可能だが、
+    // 要件通り右上に配置する。
+    if (screen === 'driving' || screen === 'feedback' || screen === 'auth' || screen === 'history') return null; 
+
+    const handleLogout = async () => {
+        await auth.signOut();
+        setUser(null);
+        setMissionHistory([]);
+    }
+
+    return (
+        <div className="absolute top-8 right-8 z-50 flex flex-col items-end gap-2">
+            <div className="px-6 py-2 bg-slate-800/90 border-l-4 border-blue-500 rounded-r text-sm font-mono tracking-widest">PLAYER: {user ? (user.email?.split('@')[0]?.toUpperCase() || 'DRIVER') : 'GUEST'}</div>
+            <div className="flex gap-3 text-xs font-mono">
+                {user ? (
+                    <>
+                    <button 
+                    onClick={() => setScreen('history')}
+                    className='text-cyan-400 hover:text-cyan-300 transition-colors underline'
+                    >Driving History</button>
+                    <span className='test-slate-600'>|</span>
+                    <button onClick={handleLogout}
+                    className='text-slate-400 hover:text-red-400 transition-colors'
+                    >
+                        Logout
+                    </button>
+                    </>
+                 ) : (
+                    <button onClick={() => setScreen('auth')}
+                    className='text-cyan-400 hover:text-cyan-300 transition-colors'
+                    >
+                        Login / Register
+                    </button>
+                 )}
+                 </div>
+                 </div>
+    );
+}
+                
 
 class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean, error: string}> {
   constructor(props: {children: ReactNode}) {
@@ -110,6 +162,16 @@ export default function ClientApp() {
   const screen = useDrivingStore(state => state.screen);
   const isPaused = useDrivingStore(state => state.isPaused);
   const setIsPaused = useDrivingStore(state => state.setIsPaused);
+  const setScreen = useDrivingStore(state => state.setScreen);
+  const setMisssionState = useDrivingStore(state => state.setMissionState);
+
+  useDrivingFeedback(); // Activate Feedback Logic
+
+  const handleGoHome = () => {
+    setIsPaused(false);
+    setMisssionState('idle');
+    setScreen('home');
+  }
 
   // クリックした時の動作（ボタンの上でクリックした時は反応しないようにする工夫付き）
   const handleGlobalClick = (e: React.MouseEvent) => {
@@ -117,24 +179,27 @@ export default function ClientApp() {
     if ((e.target as HTMLElement).closest('button')) {
       return;
     }
-    setIsPaused(!isPaused);
+    if (screen === 'driving'){
+      setIsPaused(!isPaused);
+    }
   };
 
   return (
     <ErrorBoundary>
         <div 
-            style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden', cursor: 'pointer' }} 
+            style={{ width: '100%', height: '100vh', position: 'relative', backgroundColor: 'black', overflow: 'hidden', cursor: screen === 'driving' ? 'pointer' : 'default' }} 
             onClick={handleGlobalClick}
         >
-          
+          <UserProfileHeader />
+
           {/* Pause Overlay */}
-          {isPaused && (
+          {screen === 'driving' && isPaused && (
             <div style={{
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
               backgroundColor: 'rgba(0, 0, 0, 0.6)', 
               zIndex: 999, 
-              display: 'flex', justifyContent: 'center', alignItems: 'center',
-              pointerEvents: 'none', 
+              display: 'flex', flexDirection:'column', justifyContent: 'center', alignItems: 'center', gap:'20px',
+              // pointerEvents: 'none', 
             }}>
               <h1 style={{ 
                 color: 'white', fontSize: '80px', fontWeight: 'bold', letterSpacing: '10px',
@@ -142,10 +207,32 @@ export default function ClientApp() {
               }}>
                 PAUSED ⏸
               </h1>
+              <p style={{color: '#94a3b8', fontSize: '18px'}}>画面をクリックして再開</p>
+              <div style={{display: 'flex', gap:'20px', marginTop:'20px'}}>
+                 <button
+                  onClick={handleGoHome}
+                  style={{
+                    padding: '16px 32px',
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    backgroundColor: '#dc2626',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+                    transition: 'background 0.2s',
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#b91c1c'}
+                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                >ホームへ戻る</button>
+              </div>
             </div>
           )}
           
           {screen === 'home' && <HomeScreen />}
+          {screen === 'auth' && <AuthScreen />}
+          {screen === 'history' && <HistoryScreen />}
 
           {screen === 'driving' && (
               <>
