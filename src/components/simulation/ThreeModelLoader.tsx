@@ -1,7 +1,6 @@
 "use client";
 
 import { useGLTF } from "@react-three/drei";
-import { GroupProps } from "@react-three/fiber";
 import { Euler } from "three";
 
 type ThreeModelLoaderProps = GroupProps & {
