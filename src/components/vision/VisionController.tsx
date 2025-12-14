@@ -33,8 +33,11 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
   const requestRef = useRef<number>(0);
   const lastFrameTimeRef = useRef<number>(0);
 
-  const lastProcessingTimeRef = useRef<number>(0);
-  const THROTTLE_MS = 100;
+  // 最後の描画時間lastProcessingTimeRefを使用して、経過時間がTHROTTLE_MSいないなら、
+  // MediaPipeに寄る座標の取得や描画を行わない実装であると、秒数当たりに取得できるデータ点が少なく、動きがスムーズにならないため一時的に廃止
+
+  // const lastProcessingTimeRef = useRef<number>(0);
+  // const THROTTLE_MS = 100;
 
   // 1ユーロフィルタマネージャー
   const poseFilterManagerRef = useRef<PoseLandmarkFilterManager>(
@@ -128,7 +131,7 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         const faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
           baseOptions: {
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
-            delegate: "CPU"
+            delegate: "GPU"
           },
           outputFaceBlendshapes: true,
           runningMode: "VIDEO",
@@ -138,7 +141,7 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         const handLandmarker = await HandLandmarker.createFromOptions(filesetResolver, {
           baseOptions: {
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
-            delegate: "CPU"
+            delegate: "GPU"
           },
           runningMode: "VIDEO",
           numHands: 2,
@@ -150,7 +153,7 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         poseLandmarkerRef.current = await PoseLandmarker.createFromOptions(filesetResolver, {
           baseOptions: {
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
-            delegate: "CPU"
+            delegate: "GPU"
           },
           runningMode: "VIDEO",
           numPoses: 1,
@@ -223,12 +226,12 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         requestRef.current = requestAnimationFrame(predictWebcam);
         return; 
     }
-    const now = performance.now();
-    if (now - lastProcessingTimeRef.current < THROTTLE_MS){
-      requestRef.current = requestAnimationFrame(predictWebcam);
-      return;
-    }
-    lastProcessingTimeRef.current = now;
+    // const now = performance.now();
+    // if (now - lastProcessingTimeRef.current < THROTTLE_MS){
+    //   requestRef.current = requestAnimationFrame(predictWebcam);
+    //   return;
+    // }
+    // lastProcessingTimeRef.current = now;
 
     if (faceLandmarkerRef.current && handLandmarkerRef.current && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0 && video.currentTime !== lastVideoTimeRef.current) {
       // eslint-disable-next-line react-hooks/purity
@@ -489,71 +492,6 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
       }
     }
 
-    // キャリブレーション完了後、ブレーキの基準位置を描画
-    if (currentCalibrationStage === 'calibrated' && currentFootCalibration?.isCalibrated && ctx && canvas) {
-      const brakePosition = currentFootCalibration;
-      const width = canvas.width;
-      const height = canvas.height;
-
-      // ブレーキ位置を半透明の円で描画
-      ctx.save();
-      ctx.globalAlpha = 0.5;
-
-      // 右足首の基準位置
-      const rightAnkleX = brakePosition.rightAnkle.x * width;
-      const rightAnkleY = brakePosition.rightAnkle.y * height;
-
-      // 右踵の基準位置
-      const rightHeelX = brakePosition.rightHeel.x * width;
-      const rightHeelY = brakePosition.rightHeel.y * height;
-
-      // 右足先の基準位置
-      const rightFootIndexX = brakePosition.rightFootIndex.x * width;
-      const rightFootIndexY = brakePosition.rightFootIndex.y * height;
-
-      // ブレーキゾーンを示す円を描画
-      ctx.fillStyle = '#FFA500'; // オレンジ色
-      ctx.strokeStyle = '#FF4500'; // 濃いオレンジ色
-      ctx.lineWidth = 2;
-
-      // 足首を中心に円を描画
-      ctx.beginPath();
-      ctx.arc(rightAnkleX, rightAnkleY, 8, 0, 2 * Math.PI);
-      ctx.fill();
-      ctx.stroke();
-
-      // 踵を中心に円を描画
-      ctx.beginPath();
-      ctx.arc(rightHeelX, rightHeelY, 6, 0, 2 * Math.PI);
-      ctx.fill();
-      ctx.stroke();
-
-      // 足先を中心に円を描画
-      ctx.beginPath();
-      ctx.arc(rightFootIndexX, rightFootIndexY, 6, 0, 2 * Math.PI);
-      ctx.fill();
-      ctx.stroke();
-
-      // ブレーキゾーンを示す線を描画
-      ctx.strokeStyle = '#FFA500';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(rightAnkleX, rightAnkleY);
-      ctx.lineTo(rightHeelX, rightHeelY);
-      ctx.lineTo(rightFootIndexX, rightFootIndexY);
-      ctx.stroke();
-
-      // "BRAKE" テキストを描画
-      ctx.globalAlpha = 0.7;
-      ctx.fillStyle = '#FFFFFF';
-      ctx.strokeStyle = '#000000';
-      ctx.font = 'bold 14px Arial';
-      ctx.lineWidth = 3;
-      ctx.strokeText('BRAKE', rightAnkleX + 15, rightAnkleY - 10);
-      ctx.fillText('BRAKE', rightAnkleX + 15, rightAnkleY - 10);
-
-      ctx.restore();
-    }
 
     // キャリブレーション段階に応じた処理
     if (['idle', 'waiting_for_brake'].includes(currentCalibrationStage)) {
@@ -757,22 +695,6 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
             }}>
                 {statusDisplay.message}
             </div>
-        </div>
-
-        {/* 操作説明（デバッグ情報） */}
-        <div style={{
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            color: 'white',
-            fontSize: '10px',
-            padding: '6px 8px',
-            marginTop: '4px',
-            borderRadius: '4px',
-            width: '280px',
-            boxSizing: 'border-box',
-            fontFamily: 'monospace',
-            textAlign: 'center'
-        }}>
-            {debugInfo}
         </div>
     </div>
   );
