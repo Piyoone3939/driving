@@ -15,21 +15,21 @@ export function TutorialScreen() {
     const steeringAngle = useDrivingStore(state => state.steeringAngle);
     
     // チュートリアルのステップ管理
-    const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+    const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
 
-    // ステップ3に入ったらキャリブレーションを開始する
+    // ステップ4に入ったらキャリブレーションを開始する
     useEffect(() => {
-        if (step === 3 && calibrationStage === 'idle') {
+        if (step === 4 && calibrationStage === 'idle') {
             startCalibration();
         }
     }, [step, calibrationStage, startCalibration]);
 
     const nextStep = () => {
-        if (step < 4) setStep((prev) => (prev + 1) as 1 | 2 | 3 | 4);
+        if (step < 5) setStep((prev) => (prev + 1) as 1 | 2 | 3 | 4 | 5);
     };
 
     const prevStep = () => {
-        if (step > 1) setStep((prev) => (prev - 1) as 1 | 2 | 3 | 4);
+        if (step > 1) setStep((prev) => (prev - 1) as 1 | 2 | 3 | 4 | 5);
     };
 
     return (
@@ -40,12 +40,14 @@ export function TutorialScreen() {
                 <VisionController isPaused={false} />
             </div>
 
+            {/* Overlay Video Removed - now a dedicated step */}
+
             {/* コンテンツオーバーレイ */}
             <div className="relative z-10 bg-slate-800/90 p-8 rounded-xl max-w-2xl w-full shadow-2xl border border-slate-700 backdrop-blur-sm">
                 
                 {/* ステップインジケーター */}
                 <div className="flex justify-between mb-8 px-4">
-                    {[1, 2, 3, 4].map((s) => (
+                    {[1, 2, 3, 4, 5].map((s) => (
                         <div key={s} className="flex flex-col items-center">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold mb-1 ${
                                 step >= s ? 'bg-blue-600 text-white' : 'bg-slate-600 text-slate-400'
@@ -53,7 +55,7 @@ export function TutorialScreen() {
                                 {s}
                             </div>
                             <div className={`text-xs ${step >= s ? 'text-blue-400' : 'text-slate-500'}`}>
-                                {s === 1 ? 'はじめに' : s === 2 ? 'ハンドル' : s === 3 ? 'ペダル' : '完了'}
+                                {s === 1 ? 'はじめに' : s === 2 ? 'お手本' : s === 3 ? 'ハンドル' : s === 4 ? 'ペダル' : '完了'}
                             </div>
                         </div>
                     ))}
@@ -77,8 +79,30 @@ export function TutorialScreen() {
                     </div>
                 )}
 
-                {/* ステップ2: ハンドル操作 */}
+                {/* ステップ2: お手本動画 */}
                 {step === 2 && (
+                    <div className="text-center animate-in fade-in slide-in-from-right duration-300">
+                        <h2 className="text-2xl font-bold text-purple-400 mb-4">操作イメージ</h2>
+                        <p className="mb-6 text-slate-300">
+                            まずは実際の操作の様子を見てみましょう。<br/>
+                            ハンドルを回す手、アクセル・ブレーキを踏む足の動きに注目してください。
+                        </p>
+                        
+                        <div className="w-full aspect-video rounded-lg overflow-hidden shadow-lg border border-slate-600 bg-black mb-6">
+                            <video 
+                                src="/videos/tutorial.mp4" 
+                                className="w-full h-full object-contain"
+                                autoPlay 
+                                loop 
+                                playsInline
+                                controls
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* ステップ3: ハンドル操作 */}
+                {step === 3 && (
                     <div className="text-center animate-in fade-in slide-in-from-right duration-300">
                         <h2 className="text-2xl font-bold text-green-400 mb-4">ハンドル操作の基本</h2>
                         <p className="mb-6 text-slate-300">
@@ -112,8 +136,8 @@ export function TutorialScreen() {
                     </div>
                 )}
 
-                {/* ステップ3: ペダル（足）操作 */}
-                {step === 3 && (
+                {/* ステップ4: ペダル（足）操作 */}
+                {step === 4 && (
                      <div className="text-center animate-in fade-in slide-in-from-right duration-300">
                         <h2 className="text-2xl font-bold text-orange-400 mb-4">足のキャリブレーション</h2>
                         <p className="text-slate-300 mb-4">
@@ -150,8 +174,8 @@ export function TutorialScreen() {
                     </div>
                 )}
 
-                {/* ステップ4: 完了 */}
-                {step === 4 && (
+                {/* ステップ5: 完了 */}
+                {step === 5 && (
                     <div className="text-center animate-in fade-in slide-in-from-right duration-300">
                          <h2 className="text-3xl font-bold text-cyan-400 mb-6">準備完了！</h2>
                          <p className="text-lg text-slate-300 mb-8">
@@ -182,7 +206,7 @@ export function TutorialScreen() {
                         戻る
                     </button>
 
-                    {step < 4 && (
+                    {step < 5 && (
                         <button
                             onClick={nextStep}
                             className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold transition-all hover:scale-105 shadow-lg shadow-blue-500/20"
