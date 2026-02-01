@@ -206,6 +206,10 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
   
 
 
+  // Gear Logic State
+  const gearHoverStartTimeRef = useRef<number | null>(null);
+  const gearLockRef = useRef<boolean>(false); // Prevent multiple toggles while holding
+
   // ■ AI推論ループ
   const predictWebcam = () => {
     // 停止指示が出ていたらループ終了
@@ -228,14 +232,8 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         requestRef.current = requestAnimationFrame(predictWebcam);
         return; 
     }
-    // const now = performance.now();
-    // if (now - lastProcessingTimeRef.current < THROTTLE_MS){
-    //   requestRef.current = requestAnimationFrame(predictWebcam);
-    //   return;
-    // }
-    // lastProcessingTimeRef.current = now;
 
-    if (faceLandmarkerRef.current && handLandmarkerRef.current && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0 && video.currentTime !== lastVideoTimeRef.current) {
+    if (faceLandmarkerRef.current && handLandmarkerRef.current && poseLandmarkerRef.current && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0 && video.currentTime !== lastVideoTimeRef.current) {
       // eslint-disable-next-line react-hooks/purity
         const startTimeMs = performance.now();
          
@@ -246,7 +244,10 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         try {
             const drawingUtils = ctx ? new DrawingUtils(ctx) : null;
 
-            // Face Detection
+            // 1. Pose Detection (Used for Gear & Foot)
+            const poseResult = poseLandmarkerRef.current.detectForVideo(video, startTimeMs);
+
+            // 2. Face Detection
             const faceResult = faceLandmarkerRef.current.detectForVideo(video, startTimeMs);
             if (faceResult.faceLandmarks && faceResult.faceLandmarks.length > 0) {
                  if(drawingUtils) {
@@ -281,12 +282,12 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
                 }
             }
 
-            // Object Detection
+            // 3. Object Detection
             const objectResult = objectDetectorRef.current
                 ? objectDetectorRef.current.detectForVideo(video, startTimeMs)
                 : null;
 
-            // Hand Detection
+            // 4. Hand Detection
             const handResult = handLandmarkerRef.current.detectForVideo(video, startTimeMs);
             if (handResult.landmarks && drawingUtils) {
                 for (const landmarks of handResult.landmarks) {
@@ -294,12 +295,11 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
                     drawingUtils.drawLandmarks(landmarks, {color: "#FF0000", lineWidth: 2});
                 }
             }
-            const handInfo = processSteeringAndGear(handResult, objectResult);
+            
+            // 5. Process Steering & Gear (Now using Pose)
+            const handInfo = processSteeringAndGear(handResult, objectResult, poseResult);
 
-            // Run Pose Detection for Foot Pedal Recognition
-            const poseResult = poseLandmarkerRef.current 
-                ? poseLandmarkerRef.current.detectForVideo(video, startTimeMs) 
-                : null;
+            // 6. Process Foot Pedals
             if (poseResult) {
                 processPoseForPedals(poseResult, deltaTime, drawingUtils, handInfo);
             }
@@ -313,36 +313,104 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
   };
 
 
-  const processSteeringAndGear = (handResult: HandLandmarkerResult, objectResult: ObjectDetectorResult | null) => {
+  const processSteeringAndGear = (handResult: HandLandmarkerResult, objectResult: ObjectDetectorResult | null, poseResult: PoseLandmarkerResult | null) => {
       const hands = handResult.landmarks.length;
       let info = `Hands: ${hands}`;
       
-      // --- Gear Logic ---
-      // Define Gear Zone: Right side of the screen, lower half.
-      // x: 0.8 ~ 1.0, y: 0.5 ~ 1.0
-      // If a hand is in this zone, we shift to REVERSE.
-      // Otherwise, we shift to DRIVE (default).
-      
-      let newGear: "D" | "R" = "D";
-      let gearHandIndex = -1;
-      
-      for (let i = 0; i < hands; i++) {
-          const landmarks = handResult.landmarks[i];
-          const wrist = landmarks[0];
+      // --- Gear Logic (Pose Based & Timer Latch) ---
+      let isHoveringGear = false;
+      let poseLeftHip = null;
+      let shoulderWidth = 0;
+
+      // Determine Zone from Pose
+      if (poseResult && poseResult.landmarks.length > 0) {
+          const pose = poseResult.landmarks[0];
+          const leftHip = pose[23]; // LEFT_HIP
+          const leftShoulder = pose[11];
+          const rightShoulder = pose[12];
           
-          if (wrist.x > 0.8 && wrist.y > 0.5) {
-              newGear = "R";
-              gearHandIndex = i;
-              break; // Found a gear hand
+          if (leftHip && leftShoulder && rightShoulder) {
+              poseLeftHip = leftHip;
+              // Calculate shoulder width in screen coords
+              shoulderWidth = Math.sqrt(Math.pow(leftShoulder.x - rightShoulder.x, 2) + Math.pow(leftShoulder.y - rightShoulder.y, 2));
           }
       }
+
+      let gearHandIndex = -1;
       
-      // Update Gear Store (avoid frequent updates if same)
-      const currentGear = useDrivingStore.getState().gear;
-      if (currentGear !== newGear) {
-          setGear(newGear);
+      // Check if any hand is in the "Gear Zone"
+      if (poseLeftHip) {
+          for (let i = 0; i < hands; i++) {
+            const h = handResult.landmarks[i];
+            const wrist = h[0];
+
+            // Condition: 
+            // 1. Same height as hip (tolerance 0.15)
+            // 2. Distance from hip approx Shoulder Width (tolerance range)
+            const distY = Math.abs(wrist.y - poseLeftHip.y);
+            const distX = Math.abs(wrist.x - poseLeftHip.x); // Check abs distance horizontally
+
+            // Zone Def: Height matches (+/- 0.15), Distance is roughly Shoulder Width (0.5x ~ 1.5x)
+            // If user mimics holding a gear stick to the side.
+            if (distY < 0.2 && distX > shoulderWidth * 0.5 && distX < shoulderWidth * 2.0) {
+                isHoveringGear = true;
+                // Visualize Gear Hand
+                gearHandIndex = i;
+                info += ` [GearHand Detected]`;
+                break;
+            } else {
+                // Debug near misses
+                 // if (distY < 0.3) info += ` | dX:${distX.toFixed(2)} dY:${distY.toFixed(2)} W:${shoulderWidth.toFixed(2)}`;
+            }
+          }
+      } else {
+          // Fallback if no pose: Use screen coordinates (Legacy)
+          // Only if strictly needed, but user wants relative stability.
+          // For now, if no pose, we skip gear logic to avoid instability.
+          info += " (No Pose: Sit back?)";
       }
-      info += ` | Gear: ${newGear}`;
+
+      // Debug: Show why it might be failing
+      if (poseLeftHip) {
+           // info += ` | HipY:${poseLeftHip.y.toFixed(2)}`;
+      }
+
+      // Timer Logic
+      const GEAR_HOLD_TIME = 4000; // 4 seconds to confirm
+      const currentTime = performance.now();
+
+      if (isHoveringGear) {
+          if (gearHoverStartTimeRef.current === null) {
+              gearHoverStartTimeRef.current = currentTime;
+              gearLockRef.current = false;
+          }
+
+          const elapsed = currentTime - gearHoverStartTimeRef.current;
+          const progress = Math.min(elapsed / GEAR_HOLD_TIME, 1.0);
+          
+          info += ` | GearHold: ${(progress * 100).toFixed(0)}%`;
+
+          if (elapsed >= GEAR_HOLD_TIME && !gearLockRef.current) {
+              // Trigger Toggle
+              const currentGear = useDrivingStore.getState().gear;
+              const newGear = currentGear === "D" ? "R" : "D";
+              setGear(newGear);
+              gearLockRef.current = true; // Lock until exit
+              
+              // Feedback sound/effect could go here
+              console.log("GEAR SHIFTED:", newGear);
+          }
+           if (gearLockRef.current) {
+              info += ` -> LOCKED`;
+          }
+
+      } else {
+          gearHoverStartTimeRef.current = null;
+          gearLockRef.current = false;
+      }
+      
+      const currentGear = useDrivingStore.getState().gear;
+      info += ` | Gear: ${currentGear}`;
       
       // --- Steering Logic ---
       // Use hands that are NOT the gear hand.
@@ -357,9 +425,8 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
       let angle = 0;
       
       if (steeringHands.length >= 2) {
-          // Two-Hand Steering (Standard)
-          // Sort by x coordinate to distinguish left/right
-          const h1 = steeringHands[0][9]; // Middle finger MCP
+          // Two-Hand Steering
+          const h1 = steeringHands[0][9];
           const h2 = steeringHands[1][9];
           
           let left, right;
@@ -370,52 +437,40 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
           const dx = right.x - left.x;
           angle = Math.atan2(dy, dx);
           
-          // Sensitivity adjustments
           const sensitivity = 0.8;
           steering = -angle * sensitivity;
           
       } else if (steeringHands.length === 1) {
-          // Single-Hand Steering (One Hand Detected or One Hand Shifting)
-          // Calculate tilt of the single hand.
-          // Using Wrist (0) and Middle Finger MCP (9)
+          // Single-Hand Steering
           const wrist = steeringHands[0][0];
           const middle = steeringHands[0][9];
           
           const dy = middle.y - wrist.y;
           const dx = middle.x - wrist.x;
           
-          // Upright (Straight) is -90 degrees (-PI/2).
-          // We want deviation from -PI/2.
           const handAngle = Math.atan2(dy, dx);
           const neutralAngle = -Math.PI / 2;
           
           let diff = handAngle - neutralAngle;
-          
-          // Normalize to -PI to PI
           if (diff > Math.PI) diff -= 2 * Math.PI;
           if (diff < -Math.PI) diff += 2 * Math.PI;
           
-          // Sensitivity for single hand
           const oneHandSensitivity = 1.5;
           steering = diff * oneHandSensitivity;
           angle = diff; 
           
       } else {
-          // No hands for steering
           steering = 0;
       }
       
-      // Clamp
       const deadzone = 0.05;
       if (Math.abs(steering) < deadzone) steering = 0;
       steering = Math.max(-1, Math.min(1, steering));
       
-      // Update Steering Store
       setSteering(steering);
       
       info += ` | Str: ${steering.toFixed(2)}`;
       
-      // Object Detection Info (Optional Display)
       if (objectResult && objectResult.detections.length > 0) {
           const det = objectResult.detections[0];
           const cat = det.categories[0];
@@ -644,28 +699,41 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         bgColor: 'rgba(255, 255, 0, 0.2)'
       };
     } else if (calibrationStage === 'calibrated' && footCalibration?.isCalibrated) {
+      // GearHoldの進捗があれば表示
+      const gearHoldMatch = debugInfo.match(/GearHold: \d+%/);
+      const gearHoldText = gearHoldMatch ? `\n${gearHoldMatch[0]}` : '';
+
+      // ギアによるスタイル分岐
+      const isReverse = gear === 'R';
+      const gearLabel = isReverse ? '【 R: バック 】' : '【 D: ドライブ 】';
+      const gearColor = isReverse ? '#d946ef' : '#FFFFFF'; // Reverse = Purple, Drive = White (default status)
+      
+      // ベースの色（ペダル操作があればそれを優先、なければギア色）
+      let baseTitle = isReverse ? '⚠️ バック中' : '⚪ 待機中';
+      let baseColor = isReverse ? '#d946ef' : '#FFFFFF'; 
+      let baseBg = isReverse ? 'rgba(217, 70, 239, 0.2)' : 'rgba(255, 255, 255, 0.1)';
+
       if (pedalState.isBrakePressed) {
-        return {
-          title: '🔴 ブレーキ',
-          message: `制動力: ${(pedalState.brake * 100).toFixed(0)}%`,
-          color: '#FF0000',
-          bgColor: 'rgba(255, 0, 0, 0.2)'
-        };
+          baseTitle = '🔴 ブレーキ';
+          baseColor = '#FF0000';
+          baseBg = 'rgba(255, 0, 0, 0.2)';
       } else if (pedalState.isAccelPressed) {
-        return {
-          title: '🟢 アクセル',
-          message: `スロットル: ${(pedalState.throttle * 100).toFixed(0)}%`,
-          color: '#00FF00',
-          bgColor: 'rgba(0, 255, 0, 0.2)'
-        };
-      } else {
-        return {
-          title: '⚪ 待機中',
-          message: 'ペダル操作なし',
-          color: '#FFFFFF',
-          bgColor: 'rgba(255, 255, 255, 0.1)'
-        };
+          baseTitle = '🟢 アクセル';
+          baseColor = '#00FF00';
+          baseBg = 'rgba(0, 255, 0, 0.2)';
       }
+
+      // Reverseの場合は枠線を強調
+      const borderColor = isReverse ? '#d946ef' : baseColor;
+      
+      return {
+          title: `${baseTitle} ${gearLabel}`,
+          message: `スロットル: ${(pedalState.throttle * 100).toFixed(0)}% | ブレーキ: ${(pedalState.brake * 100).toFixed(0)}%${gearHoldText}`,
+          color: baseColor,
+          bgColor: baseBg,
+          borderColor: borderColor // Custom prop to handle border separately
+      };
+
     } else {
       return {
         title: '📷 カメラ起動中',
@@ -712,7 +780,7 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         <div style={{
             backgroundColor: statusDisplay.bgColor,
             backdropFilter: 'blur(10px)',
-            border: `2px solid ${statusDisplay.color}`,
+            border: `4px solid ${statusDisplay.borderColor || statusDisplay.color}`, // 太くする
             color: statusDisplay.color,
             fontSize: '14px',
             fontWeight: 'bold',
@@ -733,7 +801,8 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
             <div style={{
                 fontSize: '12px',
                 textAlign: 'center',
-                opacity: 0.9
+                opacity: 0.9,
+                whiteSpace: 'pre-wrap' 
             }}>
                 {statusDisplay.message}
             </div>
