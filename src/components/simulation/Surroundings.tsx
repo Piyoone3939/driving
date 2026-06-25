@@ -1,6 +1,6 @@
 "use client";
 
-import { Sky } from "@react-three/drei";
+import { Sky, Environment, Lightformer } from "@react-three/drei";
 import { useMemo } from "react";
 import * as THREE from "three";
 import { getCoursePath } from "@/lib/course";
@@ -40,9 +40,42 @@ export function Surroundings() {
 
   return (
     <group>
-        <Sky sunPosition={[100, 40, 100]} turbidity={0.5} rayleigh={0.5} />
-        <ambientLight intensity={0.7} />
-        <directionalLight position={[50, 100, 50]} intensity={1.5} castShadow />
+        {/* Low, warm late-afternoon sun: deeper sky + visible sun glow for a cinematic look. */}
+        <Sky sunPosition={[95, 18, 75]} turbidity={9} rayleigh={2.4} mieCoefficient={0.012} mieDirectionalG={0.92} />
+
+        {/* --- Single light rig (Scene.tsx no longer adds its own lights) --- */}
+        {/* Reduced bounce fill keeps contrast high: warm lit side, cool shadow side. */}
+        <hemisphereLight args={["#9db8e0", "#4a512c", 0.25]} />
+        {/* Minimal base fill so deep shadows stay rich without crushing to pure black. */}
+        <ambientLight intensity={0.05} />
+        {/* Warm sun key light — the only shadow caster. Kept low for long, dramatic shadows;
+            the ortho frustum spans the course, with a soft radius for clean edges. */}
+        <directionalLight
+            position={[80, 40, 60]}
+            intensity={3.2}
+            color="#ffe9c8"
+            castShadow
+            // 1024 (not 2048) keeps the per-frame shadow pass cheap: the car physics is
+            // frame-rate dependent, and headless-CI software-GL is fill-bound, so a 4x
+            // smaller shadow map protects the drive-to-goal e2e timing. The blur radius
+            // hides the lower resolution; the car + buildings still ground cleanly.
+            shadow-mapSize={[1024, 1024]}
+            shadow-bias={-0.0004}
+            shadow-normalBias={0.03}
+            shadow-radius={2.5}
+        >
+            <orthographicCamera attach="shadow-camera" args={[-120, 120, 120, -120, 1, 400]} />
+        </directionalLight>
+        {/* Faint cool fill from the opposite side so the shadow side keeps a little detail. */}
+        <directionalLight position={[-50, 40, -40]} intensity={0.12} color="#aecbe8" />
+
+        {/* Procedural reflection environment for metal/glass (car body, windows, mirror).
+            Pure GPU (Lightformers) — no network — and rendered once (frames={1}). */}
+        <Environment resolution={64} frames={1} environmentIntensity={0.3}>
+            <color attach="background" args={["#6f9fd8"]} />
+            <Lightformer intensity={2.2} position={[0, 12, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[40, 40, 1]} color="#ffffff" />
+            <Lightformer intensity={0.7} position={[0, 3, -14]} scale={[40, 10, 1]} color="#bcd6f7" />
+        </Environment>
 
         {/* Large Ground (Manicured Grass) */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.21, 0]} receiveShadow>
@@ -82,7 +115,7 @@ export function Surroundings() {
         
         {/* Another Building (Garage/Storage) */}
         <group position={[-40, 0, -40]}>
-             <mesh position={[0, 4, 0]} castShadow>
+             <mesh position={[0, 4, 0]} castShadow receiveShadow>
                 <boxGeometry args={[20, 8, 30]} />
                 <meshStandardMaterial color="#d0d0d0" />
             </mesh>
@@ -96,7 +129,7 @@ export function Surroundings() {
         {surroundings.map((item, i) => (
              <group key={i} position={item.position as [number, number, number]}>
                  {/* Pole Base */}
-                 <mesh position={[0, 1, 0]}>
+                 <mesh position={[0, 1, 0]} castShadow>
                      <cylinderGeometry args={[0.05, 0.05, 2, 8]} />
                      <meshStandardMaterial color="#ffff00" />
                  </mesh>

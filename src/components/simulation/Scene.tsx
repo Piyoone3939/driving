@@ -21,13 +21,20 @@ export function Scene({ cameraTarget = "player" }: { cameraTarget?: "player" | "
 
   return (
     <div style={{ width: "100%", height: "100%", backgroundColor: "#0f172a", position: "absolute", top: 0, left: 0 }}>
-      <Canvas dpr={[1, 1.5]} camera={{ position: [0, 1.2, 0.5], fov: 75 }} style={{ width: "100%", height: "100%", display: "block" }}>
+      <Canvas
+        shadows
+        dpr={[1, 1.5]}
+        camera={{ position: [0, 1.2, 0.5], fov: 75 }}
+        gl={{ antialias: true, toneMappingExposure: 1.0 }}
+        style={{ width: "100%", height: "100%", display: "block" }}
+      >
         <Suspense fallback={null}>
-          <Surroundings />
+          {/* Distance haze for depth; tuned far so near gameplay + the GOAL stay clear. */}
+          <fog attach="fog" args={["#dbe4ea", 100, 470]} />
 
-          {/* Lights */}
-          <ambientLight intensity={0.5} />
-          <directionalLight position={[10, 10, 5]} intensity={1} />
+          {/* Sky, the light rig, and the reflection environment all live in <Surroundings>
+              so there is a single source of truth for scene lighting. */}
+          <Surroundings />
 
           <Car cameraTarget={cameraTarget} />
 

@@ -111,7 +111,11 @@ test("camera-denied shows the keyboard-fallback overlay", async ({ page }) => {
 test("reaching a lesson goal triggers success + feedback (grading relocation)", async ({
   page,
 }) => {
-  test.setTimeout(120_000);
+  // Headroom: the car physics advances per-frame (no delta), so the wall-clock to
+  // the goal scales with headless-CI frame rate. The scene's shadow pass + reflection
+  // environment lower that frame rate, so this cap is set generously above the happy
+  // path (which resolves the moment the goal fires — the timeout only bounds failure).
+  test.setTimeout(160_000);
   await denyCamera(page);
   await page.addInitScript(() => localStorage.setItem("language", "ja"));
   await page.goto("/?e2e=1");
@@ -138,7 +142,7 @@ test("reaching a lesson goal triggers success + feedback (grading relocation)", 
   await page.keyboard.down("ArrowUp");
   await expect
     .poll(() => page.evaluate(() => (window as unknown as E2EWindow).__drivingStore!.getState().screen), {
-      timeout: 100_000,
+      timeout: 140_000,
     })
     .toBe("feedback");
   await page.keyboard.up("ArrowUp");

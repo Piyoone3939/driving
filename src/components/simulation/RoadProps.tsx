@@ -68,7 +68,7 @@ function StopSign({ position, orientation = "z" }: { position: [number, number, 
 
             {/* Sign Post */}
             <group position={signPos}>
-                <mesh position={[0, 1.5, 0]}>
+                <mesh position={[0, 1.5, 0]} castShadow>
                     <cylinderGeometry args={[0.05, 0.05, 3]} />
                     <meshStandardMaterial color="#ccc" />
                 </mesh>
@@ -81,7 +81,7 @@ function StopSign({ position, orientation = "z" }: { position: [number, number, 
 
                 {/* Let's mimic Japanese Stop Sign: Inverted Red Triangle with text */}
                 <group position={[0, 2.7, 0]} rotation={[Math.PI/2, Math.PI, 0]}>
-                    <mesh>
+                    <mesh castShadow>
                         <cylinderGeometry args={[0.6, 0.6, 0.05, 3]} />
                         <meshStandardMaterial color="#ef4444" />
                     </mesh>
@@ -151,7 +151,7 @@ function CurveMirror({ position }: { position: [number, number, number] }) {
     return (
         <group position={[position[0], 0, position[2]]}>
             {/* Pole (Yellow/Orange) */}
-            <mesh position={[0, 1.5, 0]}>
+            <mesh position={[0, 1.5, 0]} castShadow>
                 <cylinderGeometry args={[0.05, 0.05, 3]} />
                 <meshStandardMaterial color="#f97316" />
             </mesh>
