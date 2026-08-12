@@ -1,36 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DrivingSupport
 
-## Getting Started
+DrivingSupport is a browser-based driving-practice simulator. Learners rehearse driving-related body movements with ordinary PC or smartphone cameras, supported by keyboard fallback where camera foot tracking is unsuitable.
 
-First, run the development server:
+It is supplementary preparation, repetition, review, and procedural practice. It does not replace real driving instruction or on-road practice.
+
+## Current technical baseline
+
+- Next.js, React, TypeScript, Three.js, and Zustand.
+- MediaPipe face, hand, and pose landmark processing in the browser.
+- Guided lessons, checkpoints, scoring, feedback, retry, and free mode.
+- Firebase authentication/history when configured, with guest-mode degradation when it is not.
+- Japanese/English language selection.
+
+See the public product and engineering source of truth:
+
+- [`docs/product/VISION.md`](docs/product/VISION.md)
+- [`docs/product/PRD.md`](docs/product/PRD.md)
+- [`docs/product/MVP_SCOPE.md`](docs/product/MVP_SCOPE.md)
+- [`docs/product/MVP_GAP_ANALYSIS.md`](docs/product/MVP_GAP_ANALYSIS.md)
+- [`docs/product/PRODUCT_STRATEGY.md`](docs/product/PRODUCT_STRATEGY.md)
+- [`docs/process/GITHUB_WORKFLOW.md`](docs/process/GITHUB_WORKFLOW.md)
+- [`AGENTS.md`](AGENTS.md)
+
+## Getting started
+
+Use Node 24 or newer, as declared in `package.json`.
 
 ```bash
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Verification
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run lint
+npm run type-check
+npm run build
+npm run smoke
+```
 
-## Learn More
+CI runs lint/type-check and build/smoke checks across supported operating systems.
 
-To learn more about Next.js, take a look at the following resources:
+## Camera and privacy
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Camera processing is central to the product. New work should follow the preferred flow of camera → browser-side processing → derived landmarks/state → driving logic → score. Do not add raw-video storage without an explicit reviewed requirement. Documentation must describe actual runtime behavior and must not claim local-only processing unless verified.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Confidential commercial plans, pricing, named pilot information, recruitment, and private research belong in the private operations project/repository, not this public repository.
