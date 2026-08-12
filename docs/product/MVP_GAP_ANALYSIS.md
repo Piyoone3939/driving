@@ -1,7 +1,7 @@
 # MVP gap analysis
 
-Date: 2026-08-13  
-Baseline: `main@19c54cb5a87c0756587a4a809820031a5c67d535`  
+Date: 2026-08-13
+Baseline: `main@19c54cb5a87c0756587a4a809820031a5c67d535`
 Scope: evidence-based technical audit; no new end-user functionality is introduced by GO-00.
 
 ## Status vocabulary

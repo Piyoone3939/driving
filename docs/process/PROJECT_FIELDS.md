@@ -4,12 +4,12 @@ The full launch control plane belongs in the private GitHub Project `DrivingSupp
 
 ## Required fields
 
-Status: Backlog, Ready, In Progress, In Review, Ready to Merge, Done, Blocked  
-Decision: Draft, Awaiting GO, GO, HOLD  
-Phase: P0 Governance, P1 MVP, P2 Skills, P3 Pilot, P4 Dashboard, P5 B2B  
-Priority: P0, P1, P2, P3  
-Workstream: Product, Vision, Simulation, Content, Research, BizDev, Infra, Docs  
-Risk: Low, Medium, High  
+Status: Backlog, Ready, In Progress, In Review, Ready to Merge, Done, Blocked
+Decision: Draft, Awaiting GO, GO, HOLD
+Phase: P0 Governance, P1 MVP, P2 Skills, P3 Pilot, P4 Dashboard, P5 B2B
+Priority: P0, P1, P2, P3
+Workstream: Product, Vision, Simulation, Content, Research, BizDev, Infra, Docs
+Risk: Low, Medium, High
 Effort: 1, 2, 3, 5, 8
 
 Also add Start Date, Target Date, Success Metric, Owner, and a weekly Iteration field if supported.
