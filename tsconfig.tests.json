@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": ".test-dist",
+    "rootDir": ".",
+    "noEmit": false,
+    "noEmitOnError": true
+  },
+  "include": [
+    "src/lib/guidedTrainingContract.ts",
+    "tests/guided-training-regression.test.ts"
+  ]
+}

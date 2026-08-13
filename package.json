@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
+    "test:guided": "tsc --project tsconfig.tests.json && node --test .test-dist/tests/guided-training-regression.test.js",
     "smoke": "start-server-and-test start http-get://127.0.0.1:3000 smoke:check",
     "smoke:check": "node -e \"\""
   },
