@@ -7,14 +7,16 @@ import {
   getMissedCheckpointPenalty,
   getRetryTransition,
 } from "../src/lib/guidedTrainingContract.js";
+import { MISSION_CHECKPOINTS } from "../src/lib/missionCheckpoints.js";
 
-const leftTurnCheckpoints = [
-  { id: "stop-1", type: "stop" as const, label: "一時停止" },
-  { id: "mirror-1", type: "mirror" as const, label: "安全確認" },
-];
+const leftTurnCheckpoints = MISSION_CHECKPOINTS["left-turn"] ?? [];
+const stopCheckpoint = leftTurnCheckpoints[0];
+const mirrorCheckpoint = leftTurnCheckpoints[1];
+assert.ok(stopCheckpoint);
+assert.ok(mirrorCheckpoint);
 
 test("successful left-turn result has no missed-checkpoint penalty", () => {
-  const missed = getMissedCheckpointIds(leftTurnCheckpoints, ["stop-1", "mirror-1"]);
+  const missed = getMissedCheckpointIds(leftTurnCheckpoints, [stopCheckpoint.id, mirrorCheckpoint.id]);
 
   assert.deepEqual(missed, []);
   assert.equal(getMissedCheckpointPenalty(missed), 0);
@@ -22,10 +24,10 @@ test("successful left-turn result has no missed-checkpoint penalty", () => {
 });
 
 test("missed checkpoint follows current production semantics", () => {
-  const missed = getMissedCheckpointIds(leftTurnCheckpoints, ["stop-1"]);
-  const missedMirror = leftTurnCheckpoints.find((checkpoint) => checkpoint.id === missed[0]);
+  const missed = getMissedCheckpointIds(leftTurnCheckpoints, [stopCheckpoint.id]);
+  const missedMirror = leftTurnCheckpoints.find((checkpoint) => checkpoint.id === mirrorCheckpoint.id);
 
-  assert.deepEqual(missed, ["mirror-1"]);
+  assert.deepEqual(missed, [mirrorCheckpoint.id]);
   assert.equal(getMissedCheckpointPenalty(missed), 20);
   assert.equal(getMissedCheckpointFeedback(missedMirror!, "en"), "");
   assert.equal(calculateFinalScore([], getMissedCheckpointPenalty(missed)), 80);
@@ -39,7 +41,7 @@ test("retry transition matches the production feedback flow", () => {
 });
 
 test("keyboard pedal mode does not alter the scoring/checkpoint contract", () => {
-  const missed = getMissedCheckpointIds(leftTurnCheckpoints, ["stop-1", "mirror-1"]);
+  const missed = getMissedCheckpointIds(leftTurnCheckpoints, [stopCheckpoint.id, mirrorCheckpoint.id]);
   const penalty = getMissedCheckpointPenalty(missed);
 
   // Production scoring does not read pedalInputMode; camera and keyboard runs

@@ -1,5 +1,7 @@
-import { LessonId } from "@/lib/store";
 import { Vector3 } from "three";
+
+export { MISSION_CHECKPOINTS } from "@/lib/missionCheckpoints";
+export type { Checkpoint, CheckpointType } from "@/lib/missionCheckpoints";
 
 export function MissionController() {
   // Logic is currently handled in Car.tsx due to access requirements
@@ -62,53 +64,6 @@ export const MISSION_GOALS: Record<
     size: [10, 5, 5],
     rotation: 0,
   },
-};
-
-// Checkpoints (Stop Signs, Mirrors)
-export type CheckpointType = 'stop' | 'mirror' | 'speed-limit' | 'safety-check';
-
-export interface Checkpoint {
-    id: string;
-    type: CheckpointType;
-    position: [number, number, number];
-    radius: number;
-    visual?: "traffic-light";
-    orientation?: "z" | "x";
-    // For stop signs:
-    minDuration?: number; // How long to stop
-    // For mirrors:
-    targetYaw?: number; // Expected look direction (radians)
-    yawTolerance?: number;
-    // ✅ Added: label used for feedback display
-    label?: string;
-}
-
-export const MISSION_CHECKPOINTS: Partial<Record<LessonId, Checkpoint[]>> = {
-    'left-turn': [
-        // Stop line before intersection
-        { id: 'stop-1', type: 'stop', position: [0, 0, -25], radius: 4, minDuration: 1000, label: '一時停止' },
-        // Curve Mirror check (Look Right/Forward-Right to check traffic)
-        { id: 'mirror-1', type: 'mirror', position: [0, 0, -28], radius: 6, targetYaw: -0.5, yawTolerance: 0.5, label: '安全確認' }
-    ],
-    'right-turn': [
-        { id: 'stop-1', type: 'stop', position: [0, 0, -25], radius: 4, label: '一時停止' },
-        // Mirror on Left Corner. Look Left.
-        { id: 'mirror-1', type: 'mirror', position: [0, 0, -28], radius: 6, targetYaw: 0.5, yawTolerance: 0.5, label: '安全確認' }
-    ],
-    "traffic-light": [
-        // Stop at the signal before entering (straight-ahead only)
-        { id: "signal-1", type: "stop", position: [0, 0, -18], radius: 4, minDuration: 1200, visual: "traffic-light", orientation: "z", label: '赤信号停止' },
-    ],
-    // ✅ Added: checkpoint for the crosswalk level
-    "crosswalk": [
-        // Stop just before the crosswalk
-        { id: 'cw-stop-1', type: 'stop', position: [0, 0, -25], radius: 5, minDuration: 1000, label: '横断歩道前停止' }
-    ],
-    // ✅ Added: level 8 checkpoint
-    "railroad-crossing": [
-        // Stop just before the railroad crossing
-        { id: 'rr-stop-1', type: 'stop', position: [0, 0, -50], radius: 5, minDuration: 2000, label: '踏切前一時停止' }
-    ]
 };
 
 export function checkMissionGoal(lesson: string, position: Vector3) {

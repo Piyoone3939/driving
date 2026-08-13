@@ -20,6 +20,8 @@ The first draft tested an independent model that enforced checkpoint ordering an
 
 `store.ts` now uses the shared missed-ID, penalty, and feedback helpers. `FeedbackScreen.tsx` uses the shared score and retry-transition helpers. Runtime behavior is preserved.
 
+The left-turn checkpoint definition was also moved to the dependency-light `src/lib/missionCheckpoints.ts`. `MissionController.tsx` re-exports it for existing consumers, and the regression tests import the shared definition directly so checkpoint ID changes cannot silently leave the tests stale. The guided regression command is enforced in the existing quality job in `.github/workflows/ci.yml`.
+
 ## Regression cases
 
 - Successful result: both existing checkpoints are cleared; expects no missed penalty and score 100.
@@ -35,7 +37,7 @@ The first draft tested an independent model that enforced checkpoint ordering an
 
 ## Testability seams
 
-`src/lib/guidedTrainingContract.ts` contains the shared missed-checkpoint, penalty, final-score, feedback, and retry-transition helpers. It is independent of camera, Firebase, Three.js, time, and randomness.
+`src/lib/guidedTrainingContract.ts` contains the shared missed-checkpoint, penalty, final-score, feedback, and retry-transition helpers. `src/lib/missionCheckpoints.ts` contains the shared mission checkpoint data. Both are independent of camera, Firebase, Three.js, time, and randomness.
 
 ## Verification
 
