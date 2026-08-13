@@ -1,66 +1,67 @@
 /**
- * Deterministic contract for the existing left-turn guided-training slice.
- *
- * Runtime checkpoint registration and scoring remain in the existing store and
- * simulation components. This small, dependency-free seam makes the contract
- * testable without importing React, Three.js, Firebase, or MediaPipe.
+ * Small pure helpers extracted from the existing mission/result flow.
+ * Production imports these helpers from store.ts and FeedbackScreen.tsx;
+ * this module does not define a separate guided-training state machine.
  */
-export const LEFT_TURN_CHECKPOINTS = ["stop-1", "mirror-1"] as const;
-
-export type LeftTurnCheckpoint = (typeof LEFT_TURN_CHECKPOINTS)[number];
-export type PedalInputMode = "camera" | "keyboard";
-
-export interface GuidedTrainingRun {
-  pedalInputMode: PedalInputMode;
-  clearedCheckpointIds: LeftTurnCheckpoint[];
+export interface MissableCheckpoint {
+  id: string;
+  type: "stop" | "speed-limit" | "mirror" | "safety-check";
+  label?: string;
 }
 
-export interface GuidedTrainingResult {
-  passed: boolean;
-  score: number;
-  missedCheckpointIds: LeftTurnCheckpoint[];
-  feedback: string[];
+export interface FeedbackLike {
+  type: string;
+  meta?: Record<string, unknown>;
 }
 
-export function createGuidedTrainingRun(
-  pedalInputMode: PedalInputMode = "camera",
-): GuidedTrainingRun {
-  return { pedalInputMode, clearedCheckpointIds: [] };
+export function getMissedCheckpointIds(
+  activeCheckpoints: readonly Pick<MissableCheckpoint, "id">[],
+  clearedCheckpointIds: readonly string[],
+): string[] {
+  return activeCheckpoints
+    .filter((checkpoint) => !clearedCheckpointIds.includes(checkpoint.id))
+    .map((checkpoint) => checkpoint.id);
 }
 
-export function clearCheckpoint(
-  run: GuidedTrainingRun,
-  checkpointId: LeftTurnCheckpoint,
-): GuidedTrainingRun {
-  const nextExpected = LEFT_TURN_CHECKPOINTS[run.clearedCheckpointIds.length];
-  if (checkpointId !== nextExpected) return run;
-
-  return {
-    ...run,
-    clearedCheckpointIds: [...run.clearedCheckpointIds, checkpointId],
-  };
+export function getMissedCheckpointPenalty(missedCheckpointIds: readonly string[]): number {
+  return missedCheckpointIds.length * 20;
 }
 
-export function evaluateGuidedTrainingRun(
-  run: GuidedTrainingRun,
-): GuidedTrainingResult {
-  const missedCheckpointIds = LEFT_TURN_CHECKPOINTS.filter(
-    (checkpointId) => !run.clearedCheckpointIds.includes(checkpointId),
-  );
-  const penalty = missedCheckpointIds.length * 20;
-
-  return {
-    passed: missedCheckpointIds.length === 0,
-    score: Math.max(0, 100 - penalty),
-    missedCheckpointIds: [...missedCheckpointIds],
-    feedback: missedCheckpointIds.map(
-      (checkpointId) => `Missed checkpoint: ${checkpointId}`,
-    ),
-  };
+export function getMissedCheckpointFeedback(
+  checkpoint: MissableCheckpoint,
+  language: "ja" | "en",
+): string {
+  if (checkpoint.type === "stop") {
+    return language === "en"
+      ? "You ignored a required stop"
+      : `${checkpoint.label || "一時停止"}を無視しました`;
+  }
+  if (checkpoint.type === "safety-check") {
+    return language === "en"
+      ? "You skipped a safety check"
+      : `${checkpoint.label || "安全確認"}を行いませんでした`;
+  }
+  // Current production behavior intentionally has no missed feedback for mirrors.
+  return "";
 }
 
-export function resetGuidedTrainingRun(
-  run: GuidedTrainingRun,
-): GuidedTrainingRun {
-  return createGuidedTrainingRun(run.pedalInputMode);
+export function calculateFinalScore(
+  feedbackLogs: readonly FeedbackLike[],
+  deviationPenalty: number,
+): number {
+  const kaizenPenalty = feedbackLogs
+    .filter((log) => log.type === "KAIZEN")
+    .reduce(
+      (total, log) =>
+        total + (typeof log.meta?.penalty === "number" ? log.meta.penalty : 5),
+      0,
+    );
+  return Math.max(0, 100 - kaizenPenalty - Math.floor(deviationPenalty || 0));
+}
+
+export function getRetryTransition(): {
+  missionState: "briefing";
+  screen: "driving";
+} {
+  return { missionState: "briefing", screen: "driving" };
 }

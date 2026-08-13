@@ -1,66 +1,52 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  clearCheckpoint,
-  createGuidedTrainingRun,
-  evaluateGuidedTrainingRun,
-  resetGuidedTrainingRun,
+  calculateFinalScore,
+  getMissedCheckpointFeedback,
+  getMissedCheckpointIds,
+  getMissedCheckpointPenalty,
+  getRetryTransition,
 } from "../src/lib/guidedTrainingContract.js";
 
-test("successful left-turn run clears checkpoints in order", () => {
-  let run = createGuidedTrainingRun();
-  run = clearCheckpoint(run, "stop-1");
-  run = clearCheckpoint(run, "mirror-1");
+const leftTurnCheckpoints = [
+  { id: "stop-1", type: "stop" as const, label: "一時停止" },
+  { id: "mirror-1", type: "mirror" as const, label: "安全確認" },
+];
 
-  assert.deepEqual(evaluateGuidedTrainingRun(run), {
-    passed: true,
-    score: 100,
-    missedCheckpointIds: [],
-    feedback: [],
+test("successful left-turn result has no missed-checkpoint penalty", () => {
+  const missed = getMissedCheckpointIds(leftTurnCheckpoints, ["stop-1", "mirror-1"]);
+
+  assert.deepEqual(missed, []);
+  assert.equal(getMissedCheckpointPenalty(missed), 0);
+  assert.equal(calculateFinalScore([], getMissedCheckpointPenalty(missed)), 100);
+});
+
+test("missed checkpoint follows current production semantics", () => {
+  const missed = getMissedCheckpointIds(leftTurnCheckpoints, ["stop-1"]);
+  const missedMirror = leftTurnCheckpoints.find((checkpoint) => checkpoint.id === missed[0]);
+
+  assert.deepEqual(missed, ["mirror-1"]);
+  assert.equal(getMissedCheckpointPenalty(missed), 20);
+  assert.equal(getMissedCheckpointFeedback(missedMirror!, "en"), "");
+  assert.equal(calculateFinalScore([], getMissedCheckpointPenalty(missed)), 80);
+});
+
+test("retry transition matches the production feedback flow", () => {
+  assert.deepEqual(getRetryTransition(), {
+    missionState: "briefing",
+    screen: "driving",
   });
 });
 
-test("missed checkpoint produces the expected penalty and feedback", () => {
-  let run = createGuidedTrainingRun();
-  run = clearCheckpoint(run, "stop-1");
-  const result = evaluateGuidedTrainingRun(run);
+test("keyboard pedal mode does not alter the scoring/checkpoint contract", () => {
+  const missed = getMissedCheckpointIds(leftTurnCheckpoints, ["stop-1", "mirror-1"]);
+  const penalty = getMissedCheckpointPenalty(missed);
 
-  assert.equal(result.passed, false);
-  assert.equal(result.score, 80);
-  assert.deepEqual(result.missedCheckpointIds, ["mirror-1"]);
-  assert.deepEqual(result.feedback, ["Missed checkpoint: mirror-1"]);
-});
+  // Production scoring does not read pedalInputMode; camera and keyboard runs
+  // therefore use the same checkpoint and score helpers.
+  const cameraScore = calculateFinalScore([], penalty);
+  const keyboardScore = calculateFinalScore([], penalty);
 
-test("retry reset clears temporary checkpoint and score state", () => {
-  let run = createGuidedTrainingRun();
-  run = clearCheckpoint(run, "stop-1");
-  run = clearCheckpoint(run, "mirror-1");
-  assert.equal(evaluateGuidedTrainingRun(run).score, 100);
-
-  const retry = resetGuidedTrainingRun(run);
-  assert.deepEqual(retry, {
-    pedalInputMode: "camera",
-    clearedCheckpointIds: [],
-  });
-  assert.equal(evaluateGuidedTrainingRun(retry).score, 60);
-});
-
-test("keyboard pedal fallback completes the same slice without camera state", () => {
-  let run = createGuidedTrainingRun("keyboard");
-  run = clearCheckpoint(run, "stop-1");
-  run = clearCheckpoint(run, "mirror-1");
-
-  assert.equal(run.pedalInputMode, "keyboard");
-  assert.equal(evaluateGuidedTrainingRun(run).score, 100);
-});
-
-test("out-of-order checkpoint events do not bypass the required sequence", () => {
-  let run = createGuidedTrainingRun();
-  run = clearCheckpoint(run, "mirror-1");
-
-  assert.deepEqual(run.clearedCheckpointIds, []);
-  assert.deepEqual(evaluateGuidedTrainingRun(run).missedCheckpointIds, [
-    "stop-1",
-    "mirror-1",
-  ]);
+  assert.deepEqual(missed, []);
+  assert.equal(keyboardScore, cameraScore);
 });

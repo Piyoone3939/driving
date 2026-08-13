@@ -3,6 +3,7 @@ import { Scene } from "../simulation/Scene"; // Re-use scene for replay
 import { Suspense, useEffect, useRef } from "react";
 import {addDoc, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { calculateFinalScore, getRetryTransition } from '@/lib/guidedTrainingContract';
 
 // User-facing strings, bilingual (ja/en).
 const STRINGS = {
@@ -76,9 +77,7 @@ export function FeedbackScreen() {
     try {
         const tt = STRINGS[useDrivingStore.getState().language];
         const kaizenLogs = state.feedbackLogs.filter((l: FeedbackEvent) => l.type === 'KAIZEN');
-        const kaizenPenalty = kaizenLogs.reduce((acc: number, l: FeedbackEvent) => acc + (typeof l.meta?.penalty === 'number' ? l.meta.penalty : 5), 0);
-        const totalPenalty = kaizenPenalty + Math.floor(state.deviationPenalty || 0);
-        const score = Math.max(0, 100 - totalPenalty);
+        const score = calculateFinalScore(state.feedbackLogs, state.deviationPenalty);
 
         // Clear Time Calculation
         const diff = state.missionEndTime - state.missionStartTime;
@@ -109,8 +108,9 @@ export function FeedbackScreen() {
   const handleRetry = () => {
     setIsReplaying(false);
     clearReplayData();
-    setMissionState('briefing');
-    setScreen('driving');
+    const retryTransition = getRetryTransition();
+    setMissionState(retryTransition.missionState);
+    setScreen(retryTransition.screen);
   };
 
   const handleHome = () => {
@@ -261,10 +261,10 @@ export function FeedbackScreen() {
                     <div className="text-xs text-slate-500 mb-1">Score</div>
                     <div className="text-3xl font-bold text-blue-400">
                         {(() => {
-                            const kaizenPenalty = kaizenLogs.reduce((acc, l) => acc + (typeof l.meta?.penalty === 'number' ? l.meta.penalty : 5), 0);
-                            const deviationPenalty = useDrivingStore.getState().deviationPenalty || 0;
-                            const totalPenalty = kaizenPenalty + Math.floor(deviationPenalty);
-                            return Math.max(0, 100 - totalPenalty);
+                            return calculateFinalScore(
+                              feedbackLogs,
+                              useDrivingStore.getState().deviationPenalty,
+                            );
                         })()}
                         <span className="text-sm text-slate-500">/100</span>
                     </div>
