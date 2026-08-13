@@ -56,4 +56,4 @@ Production deployment configuration, device-matrix validation, minimal consent/t
 
 ## Related PR
 
-Pending draft PR for Issue #29.
+[#36](https://github.com/Piyoone3939/driving/pull/36) — Draft PR; merge remains prohibited until project-owner GO.
