@@ -3,6 +3,11 @@ import { FootCalibration, PedalState } from "./footPedalRecognition";
 import * as THREE from "three";
 import { User } from "firebase/auth";
 import { MISSION_CHECKPOINTS } from "@/components/simulation/MissionController";
+import {
+  getMissedCheckpointFeedback,
+  getMissedCheckpointIds,
+  getMissedCheckpointPenalty,
+} from "./guidedTrainingContract";
 
 export interface ReplayFrame {
   timestamp: number;
@@ -350,8 +355,12 @@ export const useDrivingStore = create<DrivingState>((set) => ({
 
     // ▼▼▼ Added: detect uncleared checkpoints (dynamically registered ones) ▼▼▼
     // Find entries that are in activeCheckpoints but not in clearedCheckpointIds
-    const missedCheckpoints = st.activeCheckpoints.filter(
-        cp => !st.clearedCheckpointIds.includes(cp.id)
+    const missedCheckpointIds = getMissedCheckpointIds(
+      st.activeCheckpoints,
+      st.clearedCheckpointIds,
+    );
+    const missedCheckpoints = st.activeCheckpoints.filter((cp) =>
+      missedCheckpointIds.includes(cp.id),
     );
     // ▲▲▲ End of addition ▲▲▲
 
@@ -383,12 +392,7 @@ export const useDrivingStore = create<DrivingState>((set) => ({
       // English mode uses type-based wording; Japanese mode keeps the specific
       // checkpoint label (which is the JA-mode display text).
       missedCheckpoints.forEach(cp => {
-        let msg = "";
-        if (cp.type === 'stop') {
-          msg = lang === 'en' ? 'You ignored a required stop' : `${cp.label || '一時停止'}を無視しました`;
-        } else if (cp.type === 'safety-check') {
-          msg = lang === 'en' ? 'You skipped a safety check' : `${cp.label || '安全確認'}を行いませんでした`;
-        }
+        const msg = getMissedCheckpointFeedback(cp, lang);
 
         if (msg) {
             newLogs.push({
@@ -401,7 +405,7 @@ export const useDrivingStore = create<DrivingState>((set) => ({
       // ▲▲▲ End of addition ▲▲▲
 
       // Add a penalty based on the number of uncleared checkpoints (e.g. 20 points each)
-      const missedPenalty = missedCheckpoints.length * 20;
+      const missedPenalty = getMissedCheckpointPenalty(missedCheckpointIds);
 
       return {
         deviationPenalty: s.deviationPenalty + deviationPenalty + missedPenalty,
