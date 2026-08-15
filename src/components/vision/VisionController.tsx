@@ -5,13 +5,20 @@ import { FilesetResolver, FaceLandmarker, HandLandmarker, DrawingUtils, HandLand
 import { useDrivingStore } from "@/lib/store";
 import { processPedalRecognition, checkFootStability } from "@/lib/footPedalRecognition";
 import { PoseLandmarkFilterManager } from "@/lib/oneEuroFilter";
+import { classifyCameraFailure } from "@/lib/onboardingRecovery";
 
 // How often (ms) the per-frame status string is allowed to be written to the
 // store. The detection loop runs at display rate; the human-readable panel only
 // needs to refresh a few times per second.
 const DEBUG_THROTTLE_MS = 150;
 
-export default function VisionController({ isPaused }: { isPaused: boolean }) {
+export default function VisionController({
+  isPaused,
+  onKeyboardFallback,
+}: {
+  isPaused: boolean;
+  onKeyboardFallback?: () => void;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -30,6 +37,7 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
   const setCalibrationStage = useDrivingStore((state) => state.setCalibrationStage);
   const setGaze = useDrivingStore((state) => state.setGaze); // Gaze action
   const setGear = useDrivingStore((state) => state.setGear);
+  const activateKeyboardPedalFallback = useDrivingStore((state) => state.activateKeyboardPedalFallback);
 
 
   // References
@@ -112,6 +120,12 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
     setDebugInfo("Camera Stopped (Paused)");
   }, [setDebugInfo]);
 
+  const activateKeyboardFallback = useCallback(() => {
+    activateKeyboardPedalFallback();
+    onKeyboardFallback?.();
+    setCameraError(null);
+  }, [activateKeyboardPedalFallback, onKeyboardFallback, setCameraError]);
+
   // Function to start the camera
   const startCamera = useCallback(async () => {
     try {
@@ -148,7 +162,7 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
         setDebugInfo("Camera Started");
     } catch (e) {
         console.error("Camera Error:", e);
-        const denied = e instanceof DOMException && (e.name === "NotAllowedError" || e.name === "PermissionDeniedError");
+        const denied = classifyCameraFailure(e) === "denied";
         setCameraError(
             denied
                 ? "Camera access was denied. Allow it in your browser settings, or drive with the keyboard (use the arrow keys to steer)."
@@ -236,8 +250,10 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
             poseLandmarkerRef.current = null;
             objectDetectorRef.current = null;
         }
-      } catch (error) {
+    } catch (error) {
         console.error(error);
+        setCameraError("Vision setup failed. Retry camera setup or use keyboard pedals to continue.");
+        setDebugInfo("Vision setup error: " + String(error));
       }
     }
     setupMediaPipe();
@@ -798,6 +814,20 @@ export default function VisionController({ isPaused }: { isPaused: boolean }) {
                 cursor: 'pointer',
               }}
             >Retry</button>
+            <button
+              onClick={activateKeyboardFallback}
+              style={{
+                marginLeft: '8px',
+                padding: '6px 10px',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                color: '#164e63',
+                backgroundColor: '#a5f3fc',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+              }}
+            >Use keyboard pedals</button>
           </div>
         )}
 
