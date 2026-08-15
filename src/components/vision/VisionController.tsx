@@ -5,7 +5,7 @@ import { FilesetResolver, FaceLandmarker, HandLandmarker, DrawingUtils, HandLand
 import { useDrivingStore } from "@/lib/store";
 import { processPedalRecognition, checkFootStability } from "@/lib/footPedalRecognition";
 import { PoseLandmarkFilterManager } from "@/lib/oneEuroFilter";
-import { classifyCameraFailure, getRecoveryRetryAction, RecoveryKind } from "@/lib/onboardingRecovery";
+import { classifyCameraFailure, getRecoveryCopy, getRecoveryRetryAction, RecoveryKind } from "@/lib/onboardingRecovery";
 
 // How often (ms) the per-frame status string is allowed to be written to the
 // store. The detection loop runs at display rate; the human-readable panel only
@@ -40,6 +40,7 @@ export default function VisionController({
   const setGaze = useDrivingStore((state) => state.setGaze); // Gaze action
   const setGear = useDrivingStore((state) => state.setGear);
   const activateKeyboardPedalFallback = useDrivingStore((state) => state.activateKeyboardPedalFallback);
+  const language = useDrivingStore((state) => state.language);
 
 
   // References
@@ -811,12 +812,7 @@ export default function VisionController({
   };
 
   const statusDisplay = getStatusDisplay();
-  const recoveryTitle = recoveryKind === "vision-error"
-    ? "⚙️ Vision setup unavailable"
-    : recoveryKind === "camera-denied"
-      ? "📷 Camera permission denied"
-      : "📷 Camera unavailable";
-  const retryLabel = recoveryKind === "vision-error" ? "Retry vision setup" : "Retry camera";
+  const recoveryCopy = getRecoveryCopy(recoveryKind, language);
 
   return (
     <div style={{
@@ -841,7 +837,7 @@ export default function VisionController({
             color: '#fff',
             padding: '14px 16px',
             borderRadius: '10px',
-            width: '280px',
+            width: 'min(320px, calc(100vw - 32px))',
             marginBottom: '8px',
             boxSizing: 'border-box',
             boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
@@ -849,40 +845,48 @@ export default function VisionController({
             lineHeight: 1.5,
             pointerEvents: 'auto',
           }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '14px' }}>{recoveryTitle}</div>
-            <div style={{ marginBottom: '10px' }}>{cameraError}</div>
-            <button
-              onClick={retryRecovery}
-              disabled={isSettingUpVision}
-              style={{
-                padding: '6px 14px',
-                fontSize: '13px',
-                fontWeight: 'bold',
-                color: '#7f1d1d',
-                backgroundColor: '#fff',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-              }}
-            >{isSettingUpVision ? 'Retrying...' : retryLabel}</button>
-            <button
-              onClick={activateKeyboardFallback}
-              style={{
-                marginLeft: '8px',
-                padding: '6px 10px',
-                fontSize: '13px',
-                fontWeight: 'bold',
-                color: '#164e63',
-                backgroundColor: '#a5f3fc',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-              }}
-            >Use keyboard pedals</button>
+            <div style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '14px' }}>{recoveryCopy.title}</div>
+            <div style={{ marginBottom: '10px' }}>{recoveryCopy.message}</div>
+            {recoveryCopy.settingsHint && (
+              <div style={{ marginBottom: '12px', color: '#fecaca', fontSize: '12px' }}>{recoveryCopy.settingsHint}</div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                onClick={retryRecovery}
+                disabled={isSettingUpVision}
+                style={{
+                  width: '100%',
+                  minHeight: '38px',
+                  padding: '8px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  color: '#7f1d1d',
+                  backgroundColor: '#fff',
+                  border: 'none',
+                  borderRadius: '7px',
+                  cursor: 'pointer',
+                }}
+              >{isSettingUpVision ? (language === 'ja' ? '再試行中...' : 'Retrying...') : recoveryCopy.retryLabel}</button>
+              <button
+                onClick={activateKeyboardFallback}
+                style={{
+                  width: '100%',
+                  minHeight: '38px',
+                  padding: '8px 12px',
+                  fontSize: '13px',
+                  fontWeight: 'bold',
+                  color: '#164e63',
+                  backgroundColor: '#a5f3fc',
+                  border: 'none',
+                  borderRadius: '7px',
+                  cursor: 'pointer',
+                }}
+              >{recoveryCopy.fallbackLabel}</button>
+            </div>
           </div>
         )}
 
-        <div style={{
+        {!cameraError && <div style={{
           position: "relative",
           width: "240px",
           height: "180px",
@@ -896,10 +900,10 @@ export default function VisionController({
                 backgroundColor: 'black', // This is visible when stopped
                 transform: 'scaleX(-1)'
             }} />
-        </div>
+        </div>}
 
         {/* Status display panel */}
-        <div style={{
+        {!cameraError && <div style={{
             backgroundColor: statusDisplay.bgColor,
             backdropFilter: 'blur(10px)',
             border: `2px solid ${statusDisplay.color}`,
@@ -927,7 +931,7 @@ export default function VisionController({
             }}>
                 {statusDisplay.message}
             </div>
-        </div>
+        </div>}
     </div>
   );
 }

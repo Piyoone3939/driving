@@ -21,6 +21,9 @@
 - Camera mode selection resets calibration state so returning from keyboard mode starts a fresh calibration attempt.
 - Added explicit Camera pedal / Keyboard pedal text on the final tutorial screen.
 - MediaPipe setup errors now enter the user-facing recovery panel with distinct copy and a vision-specific Retry action instead of only being logged.
+- Recovery copy is selected from the app language and overlapping camera/status panels are hidden while recovery is active.
+- Onboarding and driving are blocked behind a landscape gate for portrait viewports below 1024px; the gate renders no underlying training controls until landscape.
+- Recovery buttons use an equal-width vertical stack that fits narrow viewports.
 
 ## Technical decisions
 
@@ -36,6 +39,8 @@
 - initialization errors classify as retryable errors;
 - vision setup failure selects the vision-setup retry path rather than camera-only retry;
 - keyboard fallback clears calibration requirements and selects keyboard pedals.
+- Japanese and English recovery copy routes correctly by failure kind.
+- Portrait mobile/tablet dimensions require landscape while desktop and landscape dimensions remain unblocked.
 
 ## Manual verification
 

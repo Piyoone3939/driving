@@ -13,6 +13,7 @@ import { HistoryScreen } from '@/components/ui/HistoryScreen';
 import { auth } from '@/lib/firebase';
 import { TutorialScreen } from '@/components/ui/TutorialScreen';
 import { LanguageScreen } from '@/components/ui/LanguageScreen';
+import { OrientationGate } from '@/components/ui/OrientationGate';
 
 const VisionController = dynamic(() => import('@/components/vision/VisionController'), { ssr: false });
 const Scene = dynamic(() => import('@/components/simulation/Scene').then(mod => mod.Scene), { ssr: false });
@@ -267,8 +268,9 @@ export default function ClientApp() {
           {screen === 'auth' && <AuthScreen />}
           {screen === 'history' && <HistoryScreen />}
 
-          {screen === 'tutorial' && <TutorialScreen />}
+          {screen === 'tutorial' && <OrientationGate><TutorialScreen /></OrientationGate>}
           {screen === 'driving' && (
+              <OrientationGate>
               <>
                 <VisionController isPaused={isPaused} />
                 <MissionOverlay />
@@ -296,6 +298,7 @@ export default function ClientApp() {
                     </Suspense>
                 </div>
               </>
+              </OrientationGate>
           )}
 
           {screen === 'feedback' && <FeedbackScreen />}
