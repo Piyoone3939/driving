@@ -5,7 +5,7 @@ import { FilesetResolver, FaceLandmarker, HandLandmarker, DrawingUtils, HandLand
 import { useDrivingStore } from "@/lib/store";
 import { processPedalRecognition, checkFootStability } from "@/lib/footPedalRecognition";
 import { PoseLandmarkFilterManager } from "@/lib/oneEuroFilter";
-import { classifyCameraFailure } from "@/lib/onboardingRecovery";
+import { classifyCameraFailure, getRecoveryRetryAction, RecoveryKind } from "@/lib/onboardingRecovery";
 
 // How often (ms) the per-frame status string is allowed to be written to the
 // store. The detection loop runs at display rate; the human-readable panel only
@@ -25,6 +25,8 @@ export default function VisionController({
   // User-facing camera error (denied / unavailable / unsupported). When set, an
   // overlay explains the problem and offers a retry + keyboard-control fallback.
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [recoveryKind, setRecoveryKind] = useState<RecoveryKind>("camera-error");
+  const [isSettingUpVision, setIsSettingUpVision] = useState(false);
 
   // Store actions
   const setHeadRotation = useDrivingStore((state) => state.setHeadRotation);
@@ -68,6 +70,7 @@ export default function VisionController({
     new PoseLandmarkFilterManager(1.0, 0.004, 1.5)
   );
   const streamRef = useRef<MediaStream | null>(null); // Stream management
+  const isMountedRef = useRef(true);
   // Ref-indirection so startCamera's useCallback can invoke the loop without
   // capturing predictWebcam as a dependency (the function is declared below).
   const predictWebcamRef = useRef<() => void>(() => {});
@@ -137,6 +140,7 @@ export default function VisionController({
 
         // Browser without camera API support (e.g. insecure context / old browser).
         if (!navigator.mediaDevices?.getUserMedia) {
+            setRecoveryKind("camera-error");
             setCameraError("This browser does not support the camera. You can drive with the keyboard (use the arrow keys to steer).");
             setDebugInfo("Camera not supported");
             return;
@@ -163,6 +167,7 @@ export default function VisionController({
     } catch (e) {
         console.error("Camera Error:", e);
         const denied = classifyCameraFailure(e) === "denied";
+        setRecoveryKind(denied ? "camera-denied" : "camera-error");
         setCameraError(
             denied
                 ? "Camera access was denied. Allow it in your browser settings, or drive with the keyboard (use the arrow keys to steer)."
@@ -173,16 +178,31 @@ export default function VisionController({
   }, [setDebugInfo, setCameraError]); // Do not add predictWebcam to the dependencies (it loops)
 
   // Initialization (loading MediaPipe)
-  useEffect(() => {
-    let isMounted = true;
-    async function setupMediaPipe() {
+  const setupMediaPipe = useCallback(async () => {
+      setIsSettingUpVision(true);
+      setCameraError(null);
+      setDebugInfo("Loading AI Models...");
+
+      // Release partially-created resources before a manual retry.
+      faceLandmarkerRef.current?.close();
+      handLandmarkerRef.current?.close();
+      poseLandmarkerRef.current?.close();
+      objectDetectorRef.current?.close();
+      faceLandmarkerRef.current = null;
+      handLandmarkerRef.current = null;
+      poseLandmarkerRef.current = null;
+      objectDetectorRef.current = null;
+
+      let faceLandmarker: FaceLandmarker | null = null;
+      let handLandmarker: HandLandmarker | null = null;
+      let poseLandmarker: PoseLandmarker | null = null;
+      let objectDetector: ObjectDetector | null = null;
       try {
-        setDebugInfo("Loading AI Models...");
         const filesetResolver = await FilesetResolver.forVisionTasks(
           "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
         );
 
-        const faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+        faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
           baseOptions: {
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
             delegate: "GPU"
@@ -192,7 +212,7 @@ export default function VisionController({
           numFaces: 1
         });
 
-        const handLandmarker = await HandLandmarker.createFromOptions(filesetResolver, {
+        handLandmarker = await HandLandmarker.createFromOptions(filesetResolver, {
           baseOptions: {
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
             delegate: "GPU"
@@ -204,7 +224,7 @@ export default function VisionController({
           minTrackingConfidence: 0.3
         });
 
-        poseLandmarkerRef.current = await PoseLandmarker.createFromOptions(filesetResolver, {
+        poseLandmarker = await PoseLandmarker.createFromOptions(filesetResolver, {
           baseOptions: {
             // 'full' over 'lite': markedly better on distant / low-contrast
             // bodies (e.g. dark clothing) at a moderate GPU cost. Swap to
@@ -221,7 +241,7 @@ export default function VisionController({
           minTrackingConfidence: 0.3
         });
 
-        objectDetectorRef.current = await ObjectDetector.createFromOptions(filesetResolver, {
+        objectDetector = await ObjectDetector.createFromOptions(filesetResolver, {
           baseOptions: {
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite`,
             delegate: "GPU"
@@ -230,36 +250,59 @@ export default function VisionController({
           runningMode: "VIDEO"
         });
 
-        if (isMounted) {
-            faceLandmarkerRef.current = faceLandmarker;
-            handLandmarkerRef.current = handLandmarker;
-            setVisionReady(true);
-            setDebugInfo("Models Ready.");
-
-            // On first load completion, start the camera if not paused
-            if (!isPausedRef.current) {
-                startCamera();
-            }
-        } else {
-            // Unmounted while models were still loading (e.g. React StrictMode's
-            // double mount in development) — release everything we created.
-            faceLandmarker.close();
-            handLandmarker.close();
-            poseLandmarkerRef.current?.close();
-            objectDetectorRef.current?.close();
-            poseLandmarkerRef.current = null;
-            objectDetectorRef.current = null;
+        if (!isMountedRef.current) {
+          faceLandmarker.close();
+          handLandmarker.close();
+          poseLandmarker.close();
+          objectDetector.close();
+          return;
         }
-    } catch (error) {
+
+        faceLandmarkerRef.current = faceLandmarker;
+        handLandmarkerRef.current = handLandmarker;
+        poseLandmarkerRef.current = poseLandmarker;
+        objectDetectorRef.current = objectDetector;
+        setVisionReady(true);
+        setDebugInfo("Models Ready.");
+
+        // On first load or manual retry, start the camera if not paused.
+        if (!isPausedRef.current) {
+            await startCamera();
+        }
+      } catch (error) {
         console.error(error);
-        setCameraError("Vision setup failed. Retry camera setup or use keyboard pedals to continue.");
+        faceLandmarker?.close();
+        handLandmarker?.close();
+        poseLandmarker?.close();
+        objectDetector?.close();
+        faceLandmarkerRef.current = null;
+        handLandmarkerRef.current = null;
+        poseLandmarkerRef.current = null;
+        objectDetectorRef.current = null;
+        setVisionReady(false);
+        setRecoveryKind("vision-error");
+        setCameraError("Vision setup failed. Retry vision setup or use keyboard pedals to continue.");
         setDebugInfo("Vision setup error: " + String(error));
+      } finally {
+        setIsSettingUpVision(false);
       }
+  }, [setCameraError, setDebugInfo, setVisionReady, startCamera]);
+
+  const retryRecovery = useCallback(() => {
+    setCameraError(null);
+    if (getRecoveryRetryAction(recoveryKind) === "vision-retry") {
+      void setupMediaPipe();
+    } else {
+      void startCamera();
     }
-    setupMediaPipe();
+  }, [recoveryKind, setCameraError, setupMediaPipe, startCamera]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    void setupMediaPipe();
 
     return () => {
-        isMounted = false;
+        isMountedRef.current = false;
         stopCamera(); // Make sure to stop on unmount
         // Release MediaPipe model resources to avoid leaking GPU/WASM contexts.
         faceLandmarkerRef.current?.close();
@@ -272,7 +315,7 @@ export default function VisionController({
         objectDetectorRef.current = null;
         drawingUtilsRef.current = null;
     };
-  }, []); // Run only once
+  }, [setupMediaPipe, stopCamera]);
 
   // Turn the camera on/off in response to changes in isPaused
   useEffect(() => {
@@ -319,7 +362,6 @@ export default function VisionController({
     // lastProcessingTimeRef.current = now;
 
     if (faceLandmarkerRef.current && handLandmarkerRef.current && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0 && video.currentTime !== lastVideoTimeRef.current) {
-      // eslint-disable-next-line react-hooks/purity
         const startTimeMs = performance.now();
          
         const deltaTime = lastFrameTimeRef.current === 0 ? 16 : startTimeMs - lastFrameTimeRef.current;
@@ -769,6 +811,12 @@ export default function VisionController({
   };
 
   const statusDisplay = getStatusDisplay();
+  const recoveryTitle = recoveryKind === "vision-error"
+    ? "⚙️ Vision setup unavailable"
+    : recoveryKind === "camera-denied"
+      ? "📷 Camera permission denied"
+      : "📷 Camera unavailable";
+  const retryLabel = recoveryKind === "vision-error" ? "Retry vision setup" : "Retry camera";
 
   return (
     <div style={{
@@ -780,6 +828,7 @@ export default function VisionController({
         flexDirection: 'column',
         alignItems: 'flex-end',
         opacity: 0.9,
+        pointerEvents: 'none',
     }}>
         {/* The video tag is hidden and runs in the background */}
         <video ref={videoRef} style={{ display: 'none' }} autoPlay playsInline muted></video>
@@ -798,11 +847,13 @@ export default function VisionController({
             boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
             fontSize: '13px',
             lineHeight: 1.5,
+            pointerEvents: 'auto',
           }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '14px' }}>📷 Camera unavailable</div>
+            <div style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '14px' }}>{recoveryTitle}</div>
             <div style={{ marginBottom: '10px' }}>{cameraError}</div>
             <button
-              onClick={() => { setCameraError(null); startCamera(); }}
+              onClick={retryRecovery}
+              disabled={isSettingUpVision}
               style={{
                 padding: '6px 14px',
                 fontSize: '13px',
@@ -813,7 +864,7 @@ export default function VisionController({
                 borderRadius: '6px',
                 cursor: 'pointer',
               }}
-            >Retry</button>
+            >{isSettingUpVision ? 'Retrying...' : retryLabel}</button>
             <button
               onClick={activateKeyboardFallback}
               style={{

@@ -1,4 +1,5 @@
 export type CameraFailureKind = "denied" | "error";
+export type RecoveryKind = "camera-denied" | "camera-error" | "vision-error";
 
 export interface KeyboardFallbackState {
   pedalInputMode: "keyboard";
@@ -19,4 +20,8 @@ export function getKeyboardFallbackState(): KeyboardFallbackState {
     calibrationStage: "idle",
     footCalibration: null,
   };
+}
+
+export function getRecoveryRetryAction(kind: RecoveryKind): "camera-retry" | "vision-retry" {
+  return kind === "vision-error" ? "vision-retry" : "camera-retry";
 }

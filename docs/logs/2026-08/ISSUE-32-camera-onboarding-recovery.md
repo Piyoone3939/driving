@@ -15,11 +15,12 @@
 ## Implemented recovery paths
 
 - Added `src/lib/onboardingRecovery.ts` with dependency-free camera failure classification and keyboard fallback state helpers.
-- Added a direct `Use keyboard pedals` action to the camera error panel. It clears the calibration requirement, persists keyboard pedal mode, and preserves the optional tutorial continuation callback.
+- Added a direct `Use keyboard pedals` action to the camera error panel. The panel is an interactive foreground layer; the background preview and status are pointer-transparent so tutorial navigation remains usable.
+- Camera errors retry `getUserMedia`; vision setup errors retry MediaPipe model initialization through the same bounded manual setup callback. Partially-created models are closed before retry.
 - Added a `Retry calibration` action while calibration is waiting and a continuation action for keyboard mode.
 - Camera mode selection resets calibration state so returning from keyboard mode starts a fresh calibration attempt.
 - Added explicit Camera pedal / Keyboard pedal text on the final tutorial screen.
-- MediaPipe setup errors now enter the same user-facing recovery panel instead of only being logged.
+- MediaPipe setup errors now enter the user-facing recovery panel with distinct copy and a vision-specific Retry action instead of only being logged.
 
 ## Technical decisions
 
@@ -33,11 +34,20 @@
 
 - permission errors classify as denied;
 - initialization errors classify as retryable errors;
+- vision setup failure selects the vision-setup retry path rather than camera-only retry;
 - keyboard fallback clears calibration requirements and selects keyboard pedals.
 
 ## Manual verification
 
 Automated state and UI-path checks were completed locally. Real camera permission prompts, camera hardware, and mobile-sized viewport interaction were not available in this environment, so desktop camera allow/deny and mobile layout remain manual follow-up checks.
+
+## Manual QA checklist for preview
+
+- Desktop camera allow → tutorial → successful calibration → Camera pedal visible → playable run.
+- Desktop camera deny → visible/clickable recovery → keyboard fallback → Arrow/A-D steering and W/S pedals → playable run.
+- Camera or vision initialization error → Retry runs the corresponding initialization path.
+- Calibration failure → Retry calibration or keyboard fallback → final tutorial step.
+- Mobile-sized viewport around 390×844 → recovery controls visible, no critical action off-screen, tutorial navigation usable.
 
 ## Verification
 

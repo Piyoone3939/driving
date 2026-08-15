@@ -149,10 +149,10 @@ export function TutorialScreen() {
 
     // Start calibration once step 4 is reached
     useEffect(() => {
-        if (step === 4 && calibrationStage === 'idle') {
+        if (step === 4 && calibrationStage === 'idle' && pedalInputMode === 'camera') {
             startCalibration();
         }
-    }, [step, calibrationStage, startCalibration]);
+    }, [step, calibrationStage, pedalInputMode, startCalibration]);
 
     const nextStep = () => {
         if (step < 5) setStep((prev) => (prev + 1) as 1 | 2 | 3 | 4 | 5);
@@ -166,7 +166,7 @@ export function TutorialScreen() {
         <div className="relative w-full h-full bg-slate-900 text-white overflow-hidden flex flex-col items-center justify-center">
 
             {/* Always show VisionController in the background (so the camera feed can be checked) */}
-            <div className="absolute top-0 left-0 w-full h-full opacity-50 z-0 pointer-events-none">
+            <div className="absolute top-0 left-0 w-full h-full">
                 <VisionController
                     isPaused={false}
                     onKeyboardFallback={() => {
