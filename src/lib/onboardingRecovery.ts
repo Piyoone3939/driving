@@ -88,5 +88,5 @@ export function getRecoveryCopy(kind: RecoveryKind, language: RecoveryLanguage):
 }
 
 export function shouldRequireLandscape(width: number, height: number): boolean {
-  return width < 1024 && height > width;
+  return width <= 1024 && height > width;
 }

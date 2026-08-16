@@ -37,6 +37,8 @@ test("recovery copy follows the selected language and failure kind", () => {
 
 test("portrait mobile and tablet viewports require landscape", () => {
   assert.equal(shouldRequireLandscape(390, 844), true);
+  assert.equal(shouldRequireLandscape(1024, 1366), true);
   assert.equal(shouldRequireLandscape(844, 390), false);
+  assert.equal(shouldRequireLandscape(1366, 1024), false);
   assert.equal(shouldRequireLandscape(1440, 900), false);
 });

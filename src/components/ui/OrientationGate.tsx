@@ -11,9 +11,9 @@ const COPY = {
 
 export function OrientationGate({ children }: { children: ReactNode }) {
   const language = useDrivingStore((state) => state.language);
-  const [blocked, setBlocked] = useState(() =>
-    typeof window !== "undefined" && shouldRequireLandscape(window.innerWidth, window.innerHeight),
-  );
+  // Keep server render and first client render identical. Viewport detection
+  // happens only after hydration, before the training UI is revealed.
+  const [blocked, setBlocked] = useState<boolean | null>(null);
 
   useEffect(() => {
     const update = () => setBlocked(shouldRequireLandscape(window.innerWidth, window.innerHeight));
@@ -25,6 +25,10 @@ export function OrientationGate({ children }: { children: ReactNode }) {
       window.removeEventListener("orientationchange", update);
     };
   }, []);
+
+  if (blocked === null) {
+    return <div className="fixed inset-0 z-[5000] bg-slate-950" aria-busy="true" />;
+  }
 
   if (!blocked) return <>{children}</>;
 
