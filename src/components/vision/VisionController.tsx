@@ -815,10 +815,8 @@ export default function VisionController({
   const recoveryCopy = getRecoveryCopy(recoveryKind, language);
 
   return (
-    <div style={{
+    <div className="vision-overlay" style={{
         position: 'fixed',
-        top: '20px',
-        right: '20px',
         zIndex: 2000,
         display: 'flex',
         flexDirection: 'column',
@@ -831,55 +829,34 @@ export default function VisionController({
 
         {/* User guidance shown when the camera fails to start (retry + keyboard control fallback) */}
         {cameraError && (
-          <div style={{
+          <div className="recovery-card" style={{
             backgroundColor: 'rgba(127, 29, 29, 0.95)',
             border: '2px solid #f87171',
             color: '#fff',
-            padding: '14px 16px',
-            borderRadius: '10px',
-            width: 'min(320px, calc(100vw - 32px))',
-            marginBottom: '8px',
-            boxSizing: 'border-box',
             boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-            fontSize: '13px',
-            lineHeight: 1.5,
             pointerEvents: 'auto',
           }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '14px' }}>{recoveryCopy.title}</div>
-            <div style={{ marginBottom: '10px' }}>{recoveryCopy.message}</div>
+            <div className="recovery-title">{recoveryCopy.title}</div>
+            <div className="recovery-message">{recoveryCopy.message}</div>
             {recoveryCopy.settingsHint && (
-              <div style={{ marginBottom: '12px', color: '#fecaca', fontSize: '12px' }}>{recoveryCopy.settingsHint}</div>
+              <div className="recovery-settings-hint">{recoveryCopy.settingsHint}</div>
             )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className="recovery-actions">
               <button
                 onClick={retryRecovery}
                 disabled={isSettingUpVision}
+                className="recovery-button recovery-button-primary"
                 style={{
-                  width: '100%',
-                  minHeight: '38px',
-                  padding: '8px 12px',
-                  fontSize: '13px',
-                  fontWeight: 'bold',
                   color: '#7f1d1d',
                   backgroundColor: '#fff',
-                  border: 'none',
-                  borderRadius: '7px',
-                  cursor: 'pointer',
                 }}
               >{isSettingUpVision ? (language === 'ja' ? '再試行中...' : 'Retrying...') : recoveryCopy.retryLabel}</button>
               <button
                 onClick={activateKeyboardFallback}
+                className="recovery-button recovery-button-secondary"
                 style={{
-                  width: '100%',
-                  minHeight: '38px',
-                  padding: '8px 12px',
-                  fontSize: '13px',
-                  fontWeight: 'bold',
                   color: '#164e63',
                   backgroundColor: '#a5f3fc',
-                  border: 'none',
-                  borderRadius: '7px',
-                  cursor: 'pointer',
                 }}
               >{recoveryCopy.fallbackLabel}</button>
             </div>

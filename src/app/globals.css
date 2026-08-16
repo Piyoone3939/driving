@@ -44,3 +44,93 @@ a {
     color-scheme: dark;
   }
 }
+
+.vision-overlay {
+  top: 20px;
+  right: 20px;
+}
+
+.recovery-card {
+  width: min(320px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  margin-bottom: 8px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  box-sizing: border-box;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.recovery-title {
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.recovery-message {
+  margin-bottom: 10px;
+}
+
+.recovery-settings-hint {
+  margin-bottom: 12px;
+  color: #fecaca;
+  font-size: 12px;
+}
+
+.recovery-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recovery-button {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+@media (max-width: 600px), (max-height: 500px) {
+  .vision-overlay {
+    top: 12px;
+    right: 12px;
+  }
+
+  .recovery-card {
+    width: min(280px, calc(100vw - 24px));
+    max-height: calc(100vh - 24px);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+  }
+
+  .recovery-title {
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+
+  .recovery-message {
+    margin-bottom: 7px;
+  }
+
+  .recovery-settings-hint {
+    margin-bottom: 8px;
+    font-size: 10px;
+  }
+
+  .recovery-actions {
+    gap: 6px;
+  }
+
+  .recovery-button {
+    min-height: 35px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+  }
+}
