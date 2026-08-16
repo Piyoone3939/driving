@@ -22,7 +22,7 @@
 - Added explicit Camera pedal / Keyboard pedal text on the final tutorial screen.
 - MediaPipe setup errors now enter the user-facing recovery panel with distinct copy and a vision-specific Retry action instead of only being logged.
 - Recovery copy is selected from the app language and overlapping camera/status panels are hidden while recovery is active.
-- Onboarding and driving are blocked behind a landscape gate for portrait viewports below 1024px; the gate renders no underlying training controls until landscape.
+- Onboarding and driving are blocked behind a hydration-safe landscape gate for portrait viewports at or below 1024px; the gate renders a neutral full-screen state until measurement, then renders no underlying training controls until landscape.
 - Recovery buttons use an equal-width vertical stack that fits narrow viewports.
 
 ## Technical decisions
