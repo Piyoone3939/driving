@@ -14,6 +14,7 @@ import { auth } from '@/lib/firebase';
 import { TutorialScreen } from '@/components/ui/TutorialScreen';
 import { LanguageScreen } from '@/components/ui/LanguageScreen';
 import { OrientationGate } from '@/components/ui/OrientationGate';
+import { CameraConsent } from '@/components/ui/CameraConsent';
 
 const VisionController = dynamic(() => import('@/components/vision/VisionController'), { ssr: false });
 const Scene = dynamic(() => import('@/components/simulation/Scene').then(mod => mod.Scene), { ssr: false });
@@ -197,6 +198,9 @@ export default function ClientApp() {
   const setMisssionState = useDrivingStore(state => state.setMissionState);
   const language = useDrivingStore(state => state.language);
   const t = STRINGS[language];
+  const testSession = useDrivingStore(state => state.testSession);
+  const cameraProcessingAllowed = useDrivingStore(state => state.cameraProcessingAllowed);
+  const startTestSession = useDrivingStore(state => state.startTestSession);
 
   useDrivingFeedback(); // Activate Feedback Logic
 
@@ -271,8 +275,8 @@ export default function ClientApp() {
           {screen === 'tutorial' && <OrientationGate><TutorialScreen /></OrientationGate>}
           {screen === 'driving' && (
               <OrientationGate>
-              <>
-                <VisionController isPaused={isPaused} />
+              {!testSession ? <CameraConsent language={language} onChoose={startTestSession} /> : <>
+                {cameraProcessingAllowed && <VisionController isPaused={isPaused} />}
                 <MissionOverlay />
                 <KeyboardControls />
                 <Dashboard />
@@ -297,7 +301,7 @@ export default function ClientApp() {
                         <Scene />
                     </Suspense>
                 </div>
-              </>
+              </>}
               </OrientationGate>
           )}
 

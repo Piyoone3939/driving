@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useDrivingStore } from '@/lib/store';
 import dynamic from 'next/dynamic';
+import { CameraConsent } from './CameraConsent';
 
 // Dynamically import VisionController (avoid server-side rendering)
 const VisionController = dynamic(() => import('@/components/vision/VisionController'), { ssr: false });
@@ -141,6 +142,9 @@ export function TutorialScreen() {
     const pedalInputMode = useDrivingStore(state => state.pedalInputMode);
     const setPedalInputMode = useDrivingStore(state => state.setPedalInputMode);
     const activateKeyboardPedalFallback = useDrivingStore(state => state.activateKeyboardPedalFallback);
+    const testSession = useDrivingStore(state => state.testSession);
+    const cameraProcessingAllowed = useDrivingStore(state => state.cameraProcessingAllowed);
+    const startTestSession = useDrivingStore(state => state.startTestSession);
     const language = useDrivingStore((state) => state.language);
     const t = STRINGS[language];
 
@@ -162,18 +166,20 @@ export function TutorialScreen() {
         if (step > 1) setStep((prev) => (prev - 1) as 1 | 2 | 3 | 4 | 5);
     };
 
+    if (!testSession) {
+        return (
+            <div className="flex h-full w-full items-center justify-center bg-slate-900 p-4 text-white">
+                <CameraConsent language={language} onChoose={startTestSession} />
+            </div>
+        );
+    }
+
     return (
         <div className="relative w-full h-full bg-slate-900 text-white overflow-hidden flex flex-col items-center justify-center">
 
-            {/* Always show VisionController in the background (so the camera feed can be checked) */}
-            <div className="absolute top-0 left-0 w-full h-full">
-                <VisionController
-                    isPaused={false}
-                    onKeyboardFallback={() => {
-                        nextStep();
-                    }}
-                />
-            </div>
+            {cameraProcessingAllowed && <div className="absolute top-0 left-0 w-full h-full">
+                <VisionController isPaused={false} onKeyboardFallback={nextStep} />
+            </div>}
 
             {/* Overlay Video Removed - now a dedicated step */}
 

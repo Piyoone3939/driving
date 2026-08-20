@@ -9,6 +9,15 @@ import {
   getMissedCheckpointPenalty,
 } from "./guidedTrainingContract";
 import { getKeyboardFallbackState } from "./onboardingRecovery";
+import {
+  appendTestSessionEvent,
+  createSessionId,
+  createTestSessionState,
+  finalizeTestSession,
+  serializeTestSessionSummary,
+  SessionEventType,
+  TestSessionState,
+} from "./testSession";
 
 export interface ReplayFrame {
   timestamp: number;
@@ -171,9 +180,16 @@ export interface DrivingState {
   clearedCheckpointIds: string[];
   addClearedCheckpoint: (id: string) => void;
   resetClearedCheckpoints: () => void;
+
+  // In-memory, non-identifying usability-test session instrumentation.
+  cameraProcessingAllowed: boolean;
+  testSession: TestSessionState | null;
+  startTestSession: (cameraProcessingAllowed: boolean) => void;
+  recordTestSessionEvent: (eventType: SessionEventType, payload?: { inputMode?: "camera" | "keyboard"; failureCategory?: "camera-denied" | "camera-initialization" | "vision-initialization" | "incomplete" }) => void;
+  exportTestSession: () => string | null;
 }
 
-export const useDrivingStore = create<DrivingState>((set) => ({
+export const useDrivingStore = create<DrivingState>((set, get) => ({
   // First launch (no saved language) starts on the language-selection page;
   // returning visitors (saved choice) go straight to Home. ClientApp is
   // client-only (ssr:false), so reading localStorage here is safe.
@@ -255,9 +271,9 @@ export const useDrivingStore = create<DrivingState>((set) => ({
   missionStartTime: 0,
   missionEndTime: 0,
 
-  setMissionState: (state) =>
-    set(() => {
+  setMissionState: (state) => {
       const now = Date.now();
+      const previousState = get().missionState;
       const updates: Partial<DrivingState> = { missionState: state };
 
       if (state === "active") {
@@ -266,8 +282,19 @@ export const useDrivingStore = create<DrivingState>((set) => ({
       } else if (state === "success" || state === "failed") {
         updates.missionEndTime = now;
       }
-      return updates;
-    }),
+      set(updates);
+      const session = get().testSession;
+      if (session && state !== previousState) {
+        const eventType = state === "active" ? "lesson_started" : state === "success" ? "lesson_completed" : state === "failed" ? "lesson_failed" : null;
+        if (eventType) {
+          set({ testSession: appendTestSessionEvent(session, eventType, {
+            timestamp: now,
+            lessonId: get().currentLesson,
+            ...(eventType === "lesson_failed" ? { failureCategory: "incomplete" as const } : {}),
+          }) });
+        }
+      }
+    },
 
   deviationPenalty: 0,
   addDeviationPenalty: (amount) =>
@@ -429,14 +456,22 @@ export const useDrivingStore = create<DrivingState>((set) => ({
     if (typeof window !== "undefined") localStorage.setItem("pedalInputMode", mode);
     if (mode === "camera") {
       set({ pedalInputMode: mode, calibrationStage: "idle", footCalibration: null });
-      return;
+    } else {
+      set(getKeyboardFallbackState());
     }
-    set(getKeyboardFallbackState());
+    const session = get().testSession;
+    if (session && get().pedalInputMode !== session.selectedInputMode) {
+      set({ testSession: appendTestSessionEvent(session, "input_mode_selected", { inputMode: mode, timestamp: Date.now(), lessonId: get().currentLesson }) });
+    }
   },
   activateKeyboardPedalFallback: () => {
     const fallbackState = getKeyboardFallbackState();
     if (typeof window !== "undefined") localStorage.setItem("pedalInputMode", fallbackState.pedalInputMode);
     set(fallbackState);
+    const session = get().testSession;
+    if (session && session.selectedInputMode !== "keyboard") {
+      set({ testSession: appendTestSessionEvent(session, "input_mode_selected", { inputMode: "keyboard", timestamp: Date.now(), lessonId: get().currentLesson }) });
+    }
   },
   startCalibration: () =>
     set({
@@ -477,4 +512,31 @@ export const useDrivingStore = create<DrivingState>((set) => ({
     clearedCheckpointIds: [...state.clearedCheckpointIds, id]
   })),
   resetClearedCheckpoints: () => set({ clearedCheckpointIds: [] }),
+
+  cameraProcessingAllowed: false,
+  testSession: null,
+  startTestSession: (cameraProcessingAllowed) => {
+    const inputMode = cameraProcessingAllowed ? get().pedalInputMode : "keyboard";
+    const state = createTestSessionState({
+      sessionId: createSessionId(),
+      startedAt: Date.now(),
+      consentAccepted: cameraProcessingAllowed,
+      inputMode,
+      lessonId: get().currentLesson,
+    });
+    set({ cameraProcessingAllowed, testSession: state });
+    if (!cameraProcessingAllowed) get().activateKeyboardPedalFallback();
+  },
+  recordTestSessionEvent: (eventType, payload) => {
+    const session = get().testSession;
+    if (!session) return;
+    set({ testSession: appendTestSessionEvent(session, eventType, { ...payload, timestamp: Date.now(), lessonId: get().currentLesson }) });
+  },
+  exportTestSession: () => {
+    const session = get().testSession;
+    if (!session) return null;
+    const summary = finalizeTestSession(session, Date.now());
+    set({ testSession: summary });
+    return serializeTestSessionSummary(summary);
+  },
 }));
