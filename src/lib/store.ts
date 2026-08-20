@@ -8,6 +8,7 @@ import {
   getMissedCheckpointIds,
   getMissedCheckpointPenalty,
 } from "./guidedTrainingContract";
+import { getKeyboardFallbackState } from "./onboardingRecovery";
 
 export interface ReplayFrame {
   timestamp: number;
@@ -133,6 +134,7 @@ export interface DrivingState {
   // when legs/feet can't be tracked reliably. See docs/superpowers/plans/0004.
   pedalInputMode: "camera" | "keyboard";
   setPedalInputMode: (mode: "camera" | "keyboard") => void;
+  activateKeyboardPedalFallback: () => void;
 
   // Mission scoring/time
   missionStartTime: number;
@@ -425,7 +427,16 @@ export const useDrivingStore = create<DrivingState>((set) => ({
   setCalibrationStage: (stage) => set({ calibrationStage: stage }),
   setPedalInputMode: (mode) => {
     if (typeof window !== "undefined") localStorage.setItem("pedalInputMode", mode);
-    set({ pedalInputMode: mode });
+    if (mode === "camera") {
+      set({ pedalInputMode: mode, calibrationStage: "idle", footCalibration: null });
+      return;
+    }
+    set(getKeyboardFallbackState());
+  },
+  activateKeyboardPedalFallback: () => {
+    const fallbackState = getKeyboardFallbackState();
+    if (typeof window !== "undefined") localStorage.setItem("pedalInputMode", fallbackState.pedalInputMode);
+    set(fallbackState);
   },
   startCalibration: () =>
     set({

@@ -10,6 +10,8 @@
   },
   "include": [
     "src/lib/guidedTrainingContract.ts",
-    "tests/guided-training-regression.test.ts"
+    "src/lib/onboardingRecovery.ts",
+    "tests/guided-training-regression.test.ts",
+    "tests/onboarding-recovery.test.ts"
   ]
 }

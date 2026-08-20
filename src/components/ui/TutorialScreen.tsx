@@ -51,6 +51,10 @@ const STRINGS = {
         statusMeasuring: '足の位置を計測中...',
         statusDone: 'キャリブレーション完了',
         calibratedMessage: '設定完了！足を前へ出すとブレーキ、手前でアクセルです。',
+        cameraPedalMode: 'カメラペダル',
+        keyboardPedalMode: 'キーボードペダル（W: アクセル / S: ブレーキ）',
+        retryCalibration: 'キャリブレーションをやり直す',
+        continueWithKeyboard: 'キーボード操作で続ける',
         keyboardModeActive: 'キーボードモードで操作します（W: アクセル / S: ブレーキ）',
         backToCamera: 'カメラで足を認識する操作に戻す',
         switchToKeyboard: '足の検出がうまくいかない場合は、キーボードで操作する（W / S）',
@@ -108,6 +112,10 @@ const STRINGS = {
         statusMeasuring: 'Measuring foot position...',
         statusDone: 'Calibration complete',
         calibratedMessage: 'All set! Move your foot forward to brake and back to accelerate.',
+        cameraPedalMode: 'Camera pedal',
+        keyboardPedalMode: 'Keyboard pedal (W: accelerator / S: brake)',
+        retryCalibration: 'Retry calibration',
+        continueWithKeyboard: 'Continue with keyboard pedals',
         keyboardModeActive: 'Using keyboard controls (W: accelerator / S: brake)',
         backToCamera: 'Switch back to camera-based foot control',
         switchToKeyboard: "If foot detection isn't working well, control with the keyboard (W / S)",
@@ -132,6 +140,7 @@ export function TutorialScreen() {
     const steeringAngle = useDrivingStore(state => state.steeringAngle);
     const pedalInputMode = useDrivingStore(state => state.pedalInputMode);
     const setPedalInputMode = useDrivingStore(state => state.setPedalInputMode);
+    const activateKeyboardPedalFallback = useDrivingStore(state => state.activateKeyboardPedalFallback);
     const language = useDrivingStore((state) => state.language);
     const t = STRINGS[language];
 
@@ -140,10 +149,10 @@ export function TutorialScreen() {
 
     // Start calibration once step 4 is reached
     useEffect(() => {
-        if (step === 4 && calibrationStage === 'idle') {
+        if (step === 4 && calibrationStage === 'idle' && pedalInputMode === 'camera') {
             startCalibration();
         }
-    }, [step, calibrationStage, startCalibration]);
+    }, [step, calibrationStage, pedalInputMode, startCalibration]);
 
     const nextStep = () => {
         if (step < 5) setStep((prev) => (prev + 1) as 1 | 2 | 3 | 4 | 5);
@@ -157,8 +166,13 @@ export function TutorialScreen() {
         <div className="relative w-full h-full bg-slate-900 text-white overflow-hidden flex flex-col items-center justify-center">
 
             {/* Always show VisionController in the background (so the camera feed can be checked) */}
-            <div className="absolute top-0 left-0 w-full h-full opacity-50 z-0 pointer-events-none">
-                <VisionController isPaused={false} />
+            <div className="absolute top-0 left-0 w-full h-full">
+                <VisionController
+                    isPaused={false}
+                    onKeyboardFallback={() => {
+                        nextStep();
+                    }}
+                />
             </div>
 
             {/* Overlay Video Removed - now a dedicated step */}
@@ -305,14 +319,30 @@ export function TutorialScreen() {
                                 >
                                     {t.backToCamera}
                                 </button>
+                                <button
+                                    onClick={nextStep}
+                                    className="ml-4 text-xs text-cyan-200 underline hover:text-white transition-colors"
+                                >
+                                    {t.continueWithKeyboard}
+                                </button>
                             </div>
                         ) : (
-                            <button
-                                onClick={() => { setPedalInputMode('keyboard'); nextStep(); }}
-                                className="mt-4 text-sm text-slate-400 underline hover:text-white transition-colors"
-                            >
-                                {t.switchToKeyboard}
-                            </button>
+                            <>
+                                <button
+                                    onClick={() => { activateKeyboardPedalFallback(); nextStep(); }}
+                                    className="mt-4 text-sm text-slate-400 underline hover:text-white transition-colors"
+                                >
+                                    {t.switchToKeyboard}
+                                </button>
+                                {calibrationStage === 'waiting_for_brake' && (
+                                    <button
+                                        onClick={startCalibration}
+                                        className="ml-4 mt-4 text-sm text-yellow-300 underline hover:text-white transition-colors"
+                                    >
+                                        {t.retryCalibration}
+                                    </button>
+                                )}
+                            </>
                         )}
                     </div>
                 )}
@@ -324,6 +354,9 @@ export function TutorialScreen() {
                          <p className="text-lg text-slate-300 mb-8">
                              {t.readyLine1}<br/>
                              {t.readyLine2}
+                         </p>
+                         <p className="text-cyan-300 font-semibold mb-8">
+                             {pedalInputMode === 'keyboard' ? t.keyboardPedalMode : t.cameraPedalMode}
                          </p>
 
                          <button
