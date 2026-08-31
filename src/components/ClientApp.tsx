@@ -216,7 +216,7 @@ export default function ClientApp() {
     if ((e.target as HTMLElement).closest('button')) {
       return;
     }
-    if (screen === 'driving'){
+    if (screen === 'driving' && testSession){
       setIsPaused(!isPaused);
     }
   };
@@ -230,7 +230,7 @@ export default function ClientApp() {
           <UserProfileHeader />
 
           {/* Pause Overlay */}
-          {screen === 'driving' && isPaused && (
+          {screen === 'driving' && testSession && isPaused && (
             <div style={{
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
               backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -275,7 +275,9 @@ export default function ClientApp() {
           {screen === 'tutorial' && <OrientationGate><TutorialScreen /></OrientationGate>}
           {screen === 'driving' && (
               <OrientationGate>
-              {!testSession ? <CameraConsent language={language} onChoose={startTestSession} /> : <>
+              {!testSession ? <div className="flex h-full items-center justify-center bg-slate-900 p-4">
+                <CameraConsent language={language} onChoose={startTestSession} onDecline={handleGoHome} />
+              </div> : <>
                 {cameraProcessingAllowed && <VisionController isPaused={isPaused} />}
                 <MissionOverlay />
                 <KeyboardControls />

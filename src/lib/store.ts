@@ -11,13 +11,8 @@ import {
 import { getKeyboardFallbackState } from "./onboardingRecovery";
 import {
   appendTestSessionEvent,
-  createSessionId,
-  createTestSessionState,
-  finalizeTestSession,
-  serializeTestSessionSummary,
-  SessionEventType,
-  TestSessionState,
 } from "./testSession";
+import { createTestSessionSlice, leavesTestSession, type TestSessionSlice } from "./testSessionSlice";
 
 export interface ReplayFrame {
   timestamp: number;
@@ -79,7 +74,7 @@ export type LessonId =
 export type ScreenId = "home" | "driving" | "feedback" | "auth" | "history" | "tutorial" | "language";
 export type MissionState = "idle" | "briefing" | "active" | "success" | "failed";
 
-export interface DrivingState {
+export interface DrivingState extends TestSessionSlice {
   // Screen Management
   screen: ScreenId;
   isPaused: boolean;
@@ -181,12 +176,6 @@ export interface DrivingState {
   addClearedCheckpoint: (id: string) => void;
   resetClearedCheckpoints: () => void;
 
-  // In-memory, non-identifying usability-test session instrumentation.
-  cameraProcessingAllowed: boolean;
-  testSession: TestSessionState | null;
-  startTestSession: (cameraProcessingAllowed: boolean) => void;
-  recordTestSessionEvent: (eventType: SessionEventType, payload?: { inputMode?: "camera" | "keyboard"; failureCategory?: "camera-denied" | "camera-initialization" | "vision-initialization" | "incomplete" }) => void;
-  exportTestSession: () => string | null;
 }
 
 export const useDrivingStore = create<DrivingState>((set, get) => ({
@@ -249,7 +238,10 @@ export const useDrivingStore = create<DrivingState>((set, get) => ({
       missionHistory: [item, ...state.missionHistory],
     })),
 
-  setScreen: (screen) => set({ screen }),
+  setScreen: (screen) => {
+    if (leavesTestSession(get().screen, screen)) get().endTestSession();
+    set({ screen });
+  },
   setLanguage: (lang) => {
     if (typeof window !== "undefined") localStorage.setItem("language", lang);
     set({ language: lang });
@@ -461,7 +453,7 @@ export const useDrivingStore = create<DrivingState>((set, get) => ({
     }
     const session = get().testSession;
     if (session && get().pedalInputMode !== session.selectedInputMode) {
-      set({ testSession: appendTestSessionEvent(session, "input_mode_selected", { inputMode: mode, timestamp: Date.now(), lessonId: get().currentLesson }) });
+      get().recordTestSessionEvent("input_mode_selected", { inputMode: mode });
     }
   },
   activateKeyboardPedalFallback: () => {
@@ -470,7 +462,7 @@ export const useDrivingStore = create<DrivingState>((set, get) => ({
     set(fallbackState);
     const session = get().testSession;
     if (session && session.selectedInputMode !== "keyboard") {
-      set({ testSession: appendTestSessionEvent(session, "input_mode_selected", { inputMode: "keyboard", timestamp: Date.now(), lessonId: get().currentLesson }) });
+      get().recordTestSessionEvent("input_mode_selected", { inputMode: "keyboard" });
     }
   },
   startCalibration: () =>
@@ -513,30 +505,5 @@ export const useDrivingStore = create<DrivingState>((set, get) => ({
   })),
   resetClearedCheckpoints: () => set({ clearedCheckpointIds: [] }),
 
-  cameraProcessingAllowed: false,
-  testSession: null,
-  startTestSession: (cameraProcessingAllowed) => {
-    const inputMode = cameraProcessingAllowed ? get().pedalInputMode : "keyboard";
-    const state = createTestSessionState({
-      sessionId: createSessionId(),
-      startedAt: Date.now(),
-      consentAccepted: cameraProcessingAllowed,
-      inputMode,
-      lessonId: get().currentLesson,
-    });
-    set({ cameraProcessingAllowed, testSession: state });
-    if (!cameraProcessingAllowed) get().activateKeyboardPedalFallback();
-  },
-  recordTestSessionEvent: (eventType, payload) => {
-    const session = get().testSession;
-    if (!session) return;
-    set({ testSession: appendTestSessionEvent(session, eventType, { ...payload, timestamp: Date.now(), lessonId: get().currentLesson }) });
-  },
-  exportTestSession: () => {
-    const session = get().testSession;
-    if (!session) return null;
-    const summary = finalizeTestSession(session, Date.now());
-    set({ testSession: summary });
-    return serializeTestSessionSummary(summary);
-  },
+  ...createTestSessionSlice(set, get),
 }));

@@ -1,4 +1,4 @@
-export const TEST_SESSION_SCHEMA_VERSION = 1 as const;
+export const TEST_SESSION_SCHEMA_VERSION = 2 as const;
 
 export type SessionInputMode = "camera" | "keyboard";
 export type CameraPermissionOutcome = "unknown" | "granted" | "denied" | "failed";
@@ -30,7 +30,10 @@ export interface TestSessionState {
   schemaVersion: typeof TEST_SESSION_SCHEMA_VERSION;
   sessionId: string;
   startedAt: number;
-  consentAccepted: boolean;
+  sessionConsentAccepted: true;
+  cameraProcessingAllowed: boolean;
+  status: "active" | "completed";
+  endedAt: number | null;
   cameraPermissionOutcome: CameraPermissionOutcome;
   selectedInputMode: SessionInputMode;
   lessonId: string;
@@ -40,52 +43,75 @@ export interface TestSessionState {
   events: TestSessionEvent[];
 }
 
-export type TestSessionSummary = Omit<TestSessionState, "startedAt"> & {
-  startedAt: number;
-  endedAt: number;
-};
+export type TestSessionSummary = TestSessionState;
 
-export function canStartCamera(consentAccepted: boolean): boolean {
-  return consentAccepted;
+export function canStartCamera(session: TestSessionState | null): boolean {
+  return !!session && session.status === "active" && session.sessionConsentAccepted && session.cameraProcessingAllowed;
 }
 
-export function createSessionId(randomUuid: () => string = () => globalThis.crypto?.randomUUID?.() ?? ""): string {
-  const id = randomUuid();
-  if (id) return id;
-  return `session-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
+type SecureRandom = {
+  randomUUID?: () => string;
+  getRandomValues?: (bytes: Uint8Array) => Uint8Array;
+};
+
+export function createSessionId(cryptoSource: SecureRandom | undefined = globalThis.crypto): string {
+  if (cryptoSource?.randomUUID) return cryptoSource.randomUUID();
+  if (!cryptoSource?.getRandomValues) throw new Error("Secure session ID unavailable");
+  const bytes = cryptoSource.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 export function createTestSessionState(options: {
-  sessionId: string;
   startedAt: number;
-  consentAccepted: boolean;
+  sessionConsentAccepted: boolean;
+  cameraProcessingAllowed: boolean;
   inputMode: SessionInputMode;
   lessonId: string;
-}): TestSessionState {
+}, idFactory: () => string = createSessionId): TestSessionState | null {
+  // Declining never allocates an ID or collects even a consent-declined event.
+  if (!options.sessionConsentAccepted) return null;
   const state: TestSessionState = {
     schemaVersion: TEST_SESSION_SCHEMA_VERSION,
-    sessionId: options.sessionId,
+    sessionId: idFactory(),
     startedAt: options.startedAt,
-    consentAccepted: options.consentAccepted,
+    sessionConsentAccepted: true,
+    cameraProcessingAllowed: options.cameraProcessingAllowed,
+    status: "active",
+    endedAt: null,
     cameraPermissionOutcome: "unknown",
-    selectedInputMode: options.inputMode,
+    selectedInputMode: options.cameraProcessingAllowed ? options.inputMode : "keyboard",
     lessonId: options.lessonId,
     completed: false,
     retryCount: 0,
     failureCategories: [],
     events: [],
   };
-  return options.consentAccepted
-    ? appendTestSessionEvent(state, "consent_accepted", { timestamp: options.startedAt })
-    : appendTestSessionEvent(state, "input_mode_selected", { inputMode: "keyboard", timestamp: options.startedAt });
+  return appendTestSessionEvent(
+    appendTestSessionEvent(state, "consent_accepted", { timestamp: options.startedAt }),
+    "input_mode_selected",
+    { inputMode: state.selectedInputMode, timestamp: options.startedAt },
+  );
 }
+
+export type SessionEventPayload = {
+  timestamp?: number;
+  lessonId?: string;
+  inputMode?: SessionInputMode;
+  failureCategory?: FailureCategory;
+};
 
 export function appendTestSessionEvent(
   state: TestSessionState,
   eventType: SessionEventType,
-  payload: { timestamp?: number; lessonId?: string; inputMode?: SessionInputMode; failureCategory?: FailureCategory } = {},
+  payload: SessionEventPayload = {},
 ): TestSessionState {
-  const timestampMs = Math.max(0, (payload.timestamp ?? Date.now()) - state.startedAt);
+  if (state.status === "completed") return state;
+  const outcome = eventType === "camera_permission_granted" ? "granted"
+    : eventType === "camera_permission_denied" ? "denied"
+    : eventType === "camera_initialization_failed" ? "failed" : null;
+  // Resume/remount with the same permission outcome is not another permission decision.
+  if (outcome && outcome === state.cameraPermissionOutcome) return state;
+  const timestampMs = Math.max(0, state.events.at(-1)?.timestampMs ?? 0, (payload.timestamp ?? Date.now()) - state.startedAt);
   const event: TestSessionEvent = {
     schemaVersion: TEST_SESSION_SCHEMA_VERSION,
     sessionId: state.sessionId,
@@ -100,19 +126,22 @@ export function appendTestSessionEvent(
   if (eventType === "camera_permission_denied") next.cameraPermissionOutcome = "denied";
   if (eventType === "camera_initialization_failed") next.cameraPermissionOutcome = "failed";
   if (eventType === "input_mode_selected" && payload.inputMode) next.selectedInputMode = payload.inputMode;
+  if (payload.lessonId) next.lessonId = payload.lessonId;
   if (eventType === "lesson_completed") next.completed = true;
-  if (eventType === "lesson_failed" && payload.failureCategory && !next.failureCategories.includes(payload.failureCategory)) {
+  if (eventType === "lesson_started" || eventType === "retry_started" || eventType === "lesson_failed") next.completed = false;
+  if (payload.failureCategory && !next.failureCategories.includes(payload.failureCategory)) {
     next.failureCategories = [...next.failureCategories, payload.failureCategory];
   }
   if (eventType === "retry_started") next.retryCount += 1;
+  if (eventType === "session_completed") {
+    next.status = "completed";
+    next.endedAt = state.startedAt + timestampMs;
+  }
   return next;
 }
 
 export function finalizeTestSession(state: TestSessionState, endedAt: number): TestSessionSummary {
-  const completed = state.events.some((event) => event.eventType === "session_completed")
-    ? state
-    : appendTestSessionEvent(state, "session_completed", { timestamp: endedAt });
-  return { ...completed, endedAt };
+  return appendTestSessionEvent(state, "session_completed", { timestamp: endedAt });
 }
 
 export function serializeTestSessionSummary(summary: TestSessionSummary): string {

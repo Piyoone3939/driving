@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef } from "react";
 import {addDoc, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { calculateFinalScore, getRetryTransition } from '@/lib/guidedTrainingContract';
+import { SessionExportButton } from './SessionExportButton';
 
 // User-facing strings, bilingual (ja/en).
 const STRINGS = {
@@ -14,7 +15,6 @@ const STRINGS = {
     improvementPoints: '改善ポイント:',
     retry: 'もう一度挑戦',
     backToHome: 'ホームに戻る',
-    exportSession: 'セッション概要をエクスポート',
     missionFeedback: 'Mission Feedback',
     summaryMore: ' 他',
     summaryGreat: '素晴らしい走行でした',
@@ -26,7 +26,6 @@ const STRINGS = {
     improvementPoints: 'Points to improve:',
     retry: 'Try Again',
     backToHome: 'Back to Home',
-    exportSession: 'Export session summary',
     missionFeedback: 'Mission Feedback',
     summaryMore: ' and more',
     summaryGreat: 'A great drive',
@@ -46,7 +45,6 @@ export function FeedbackScreen() {
   const setReplayViewMode = useDrivingStore(state => state.setReplayViewMode); // New
   const feedbackLogs = useDrivingStore(state => state.feedbackLogs); // New
   const recordTestSessionEvent = useDrivingStore(state => state.recordTestSessionEvent);
-  const exportTestSession = useDrivingStore(state => state.exportTestSession);
 
   const analyzedRef = useRef(false);
 
@@ -116,17 +114,6 @@ export function FeedbackScreen() {
     const retryTransition = getRetryTransition();
     setMissionState(retryTransition.missionState);
     setScreen(retryTransition.screen);
-  };
-
-  const handleExportSession = () => {
-    const json = exportTestSession();
-    if (!json) return;
-    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = 'drivingsupport-session-summary.json';
-    anchor.click();
-    URL.revokeObjectURL(url);
   };
 
   const handleHome = () => {
@@ -318,12 +305,7 @@ export function FeedbackScreen() {
                     {t.backToHome}
                 </button>
             </div>
-            <button
-                onClick={handleExportSession}
-                className="mt-4 w-full rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700"
-            >
-                {t.exportSession}
-            </button>
+            <div className="mt-4"><SessionExportButton /></div>
         </div>
       </div>
     </div>

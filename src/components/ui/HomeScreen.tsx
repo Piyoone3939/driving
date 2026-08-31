@@ -1,5 +1,6 @@
 import { useDrivingStore } from "@/lib/store";
 import { GarageScene } from "../simulation/GarageScene";
+import { SessionExportButton } from "./SessionExportButton";
 
 // Added level 7+. Labels are bilingual (ja/en); `desc` is already English.
 const LESSONS = [
@@ -21,8 +22,10 @@ export function HomeScreen() {
   const setMissionState = useDrivingStore((state) => state.setMissionState);
   const language = useDrivingStore((state) => state.language);
   const setLanguage = useDrivingStore((state) => state.setLanguage);
+  const prepareNewTestSession = useDrivingStore((state) => state.prepareNewTestSession);
 
   const handleSelectLesson = (lessonId: (typeof LESSONS)[number]["id"]) => {
+    prepareNewTestSession();
     // チュートリアルは特別扱い
     if (lessonId === "tutorial") {
         setScreen("tutorial");
@@ -80,6 +83,7 @@ export function HomeScreen() {
         {/* Bottom Area: Carousel */}
         <div className="w-full p-8 pb-12 pointer-events-auto bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col justify-end">
           <div className="mb-4 flex items-end gap-4 border-b border-white/20 pb-2 max-w-4xl">
+            <SessionExportButton />
             <h2 className="text-2xl font-bold tracking-wider text-white">SELECT COURSE</h2>
             <span className="text-sm text-blue-400 font-mono mb-1 animate-pulse">/ ALL SYSTEMS READY</span>
           </div>

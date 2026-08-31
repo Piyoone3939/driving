@@ -169,7 +169,7 @@ export function TutorialScreen() {
     if (!testSession) {
         return (
             <div className="flex h-full w-full items-center justify-center bg-slate-900 p-4 text-white">
-                <CameraConsent language={language} onChoose={startTestSession} />
+                <CameraConsent language={language} onChoose={startTestSession} onDecline={() => setScreen('home')} />
             </div>
         );
     }
@@ -321,6 +321,7 @@ export function TutorialScreen() {
                                 </p>
                                 <button
                                     onClick={() => setPedalInputMode('camera')}
+                                    disabled={!cameraProcessingAllowed}
                                     className="text-xs text-slate-400 underline hover:text-white transition-colors"
                                 >
                                     {t.backToCamera}
