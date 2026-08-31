@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef } from "react";
 import {addDoc, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { calculateFinalScore, getRetryTransition } from '@/lib/guidedTrainingContract';
+import { SessionExportButton } from './SessionExportButton';
 
 // User-facing strings, bilingual (ja/en).
 const STRINGS = {
@@ -43,6 +44,7 @@ export function FeedbackScreen() {
   const replayViewMode = useDrivingStore(state => state.replayViewMode); // New
   const setReplayViewMode = useDrivingStore(state => state.setReplayViewMode); // New
   const feedbackLogs = useDrivingStore(state => state.feedbackLogs); // New
+  const recordTestSessionEvent = useDrivingStore(state => state.recordTestSessionEvent);
 
   const analyzedRef = useRef(false);
 
@@ -106,6 +108,7 @@ export function FeedbackScreen() {
     }
 
   const handleRetry = () => {
+    recordTestSessionEvent('retry_started');
     setIsReplaying(false);
     clearReplayData();
     const retryTransition = getRetryTransition();
@@ -302,6 +305,7 @@ export function FeedbackScreen() {
                     {t.backToHome}
                 </button>
             </div>
+            <div className="mt-4"><SessionExportButton /></div>
         </div>
       </div>
     </div>

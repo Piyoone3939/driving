@@ -9,6 +9,10 @@ import {
   getMissedCheckpointPenalty,
 } from "./guidedTrainingContract";
 import { getKeyboardFallbackState } from "./onboardingRecovery";
+import {
+  appendTestSessionEvent,
+} from "./testSession";
+import { createTestSessionSlice, leavesTestSession, type TestSessionSlice } from "./testSessionSlice";
 
 export interface ReplayFrame {
   timestamp: number;
@@ -70,7 +74,7 @@ export type LessonId =
 export type ScreenId = "home" | "driving" | "feedback" | "auth" | "history" | "tutorial" | "language";
 export type MissionState = "idle" | "briefing" | "active" | "success" | "failed";
 
-export interface DrivingState {
+export interface DrivingState extends TestSessionSlice {
   // Screen Management
   screen: ScreenId;
   isPaused: boolean;
@@ -171,9 +175,10 @@ export interface DrivingState {
   clearedCheckpointIds: string[];
   addClearedCheckpoint: (id: string) => void;
   resetClearedCheckpoints: () => void;
+
 }
 
-export const useDrivingStore = create<DrivingState>((set) => ({
+export const useDrivingStore = create<DrivingState>((set, get) => ({
   // First launch (no saved language) starts on the language-selection page;
   // returning visitors (saved choice) go straight to Home. ClientApp is
   // client-only (ssr:false), so reading localStorage here is safe.
@@ -233,7 +238,10 @@ export const useDrivingStore = create<DrivingState>((set) => ({
       missionHistory: [item, ...state.missionHistory],
     })),
 
-  setScreen: (screen) => set({ screen }),
+  setScreen: (screen) => {
+    if (leavesTestSession(get().screen, screen)) get().endTestSession();
+    set({ screen });
+  },
   setLanguage: (lang) => {
     if (typeof window !== "undefined") localStorage.setItem("language", lang);
     set({ language: lang });
@@ -255,9 +263,9 @@ export const useDrivingStore = create<DrivingState>((set) => ({
   missionStartTime: 0,
   missionEndTime: 0,
 
-  setMissionState: (state) =>
-    set(() => {
+  setMissionState: (state) => {
       const now = Date.now();
+      const previousState = get().missionState;
       const updates: Partial<DrivingState> = { missionState: state };
 
       if (state === "active") {
@@ -266,8 +274,19 @@ export const useDrivingStore = create<DrivingState>((set) => ({
       } else if (state === "success" || state === "failed") {
         updates.missionEndTime = now;
       }
-      return updates;
-    }),
+      set(updates);
+      const session = get().testSession;
+      if (session && state !== previousState) {
+        const eventType = state === "active" ? "lesson_started" : state === "success" ? "lesson_completed" : state === "failed" ? "lesson_failed" : null;
+        if (eventType) {
+          set({ testSession: appendTestSessionEvent(session, eventType, {
+            timestamp: now,
+            lessonId: get().currentLesson,
+            ...(eventType === "lesson_failed" ? { failureCategory: "incomplete" as const } : {}),
+          }) });
+        }
+      }
+    },
 
   deviationPenalty: 0,
   addDeviationPenalty: (amount) =>
@@ -429,14 +448,22 @@ export const useDrivingStore = create<DrivingState>((set) => ({
     if (typeof window !== "undefined") localStorage.setItem("pedalInputMode", mode);
     if (mode === "camera") {
       set({ pedalInputMode: mode, calibrationStage: "idle", footCalibration: null });
-      return;
+    } else {
+      set(getKeyboardFallbackState());
     }
-    set(getKeyboardFallbackState());
+    const session = get().testSession;
+    if (session && get().pedalInputMode !== session.selectedInputMode) {
+      get().recordTestSessionEvent("input_mode_selected", { inputMode: mode });
+    }
   },
   activateKeyboardPedalFallback: () => {
     const fallbackState = getKeyboardFallbackState();
     if (typeof window !== "undefined") localStorage.setItem("pedalInputMode", fallbackState.pedalInputMode);
     set(fallbackState);
+    const session = get().testSession;
+    if (session && session.selectedInputMode !== "keyboard") {
+      get().recordTestSessionEvent("input_mode_selected", { inputMode: "keyboard" });
+    }
   },
   startCalibration: () =>
     set({
@@ -477,4 +504,6 @@ export const useDrivingStore = create<DrivingState>((set) => ({
     clearedCheckpointIds: [...state.clearedCheckpointIds, id]
   })),
   resetClearedCheckpoints: () => set({ clearedCheckpointIds: [] }),
+
+  ...createTestSessionSlice(set, get),
 }));

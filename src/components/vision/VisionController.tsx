@@ -6,6 +6,7 @@ import { useDrivingStore } from "@/lib/store";
 import { processPedalRecognition, checkFootStability } from "@/lib/footPedalRecognition";
 import { PoseLandmarkFilterManager } from "@/lib/oneEuroFilter";
 import { classifyCameraFailure, getRecoveryCopy, getRecoveryRetryAction, RecoveryKind } from "@/lib/onboardingRecovery";
+import { canStartCamera, type SessionEventType, type SessionEventPayload } from "@/lib/testSession";
 
 // How often (ms) the per-frame status string is allowed to be written to the
 // store. The detection loop runs at display rate; the human-readable panel only
@@ -40,6 +41,11 @@ export default function VisionController({
   const setGaze = useDrivingStore((state) => state.setGaze); // Gaze action
   const setGear = useDrivingStore((state) => state.setGear);
   const activateKeyboardPedalFallback = useDrivingStore((state) => state.activateKeyboardPedalFallback);
+  const recordSessionEvent = useDrivingStore((state) => state.recordTestSessionEvent);
+  const sessionId = useDrivingStore((state) => state.testSession?.sessionId);
+  const recordTestSessionEvent = useCallback((eventType: SessionEventType, payload?: SessionEventPayload) => {
+    if (sessionId) recordSessionEvent(eventType, payload, sessionId);
+  }, [recordSessionEvent, sessionId]);
   const language = useDrivingStore((state) => state.language);
 
 
@@ -132,6 +138,7 @@ export default function VisionController({
 
   // Function to start the camera
   const startCamera = useCallback(async () => {
+    if (!canStartCamera(useDrivingStore.getState().testSession)) return;
     try {
         // Wait if the AI models are not ready yet (they should normally be loaded)
         if (!faceLandmarkerRef.current || !handLandmarkerRef.current) {
@@ -144,11 +151,18 @@ export default function VisionController({
             setRecoveryKind("camera-error");
             setCameraError("This browser does not support the camera. You can drive with the keyboard (use the arrow keys to steer).");
             setDebugInfo("Camera not supported");
+            recordTestSessionEvent("camera_initialization_failed", { failureCategory: "camera-initialization" });
             return;
         }
 
         const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
+        const currentSession = useDrivingStore.getState().testSession;
+        if (!isMountedRef.current || currentSession?.sessionId !== sessionId || !canStartCamera(currentSession)) {
+            stream.getTracks().forEach(track => track.stop());
+            return;
+        }
         streamRef.current = stream;
+        recordTestSessionEvent("camera_permission_granted");
         setCameraError(null);
 
         if (videoRef.current) {
@@ -168,6 +182,9 @@ export default function VisionController({
     } catch (e) {
         console.error("Camera Error:", e);
         const denied = classifyCameraFailure(e) === "denied";
+        recordTestSessionEvent(denied ? "camera_permission_denied" : "camera_initialization_failed", {
+          failureCategory: denied ? "camera-denied" : "camera-initialization",
+        });
         setRecoveryKind(denied ? "camera-denied" : "camera-error");
         setCameraError(
             denied
@@ -176,10 +193,11 @@ export default function VisionController({
         );
         setDebugInfo("Camera Error: " + String(e));
     }
-  }, [setDebugInfo, setCameraError]); // Do not add predictWebcam to the dependencies (it loops)
+  }, [recordTestSessionEvent, sessionId, setDebugInfo, setCameraError]); // Do not add predictWebcam to the dependencies (it loops)
 
   // Initialization (loading MediaPipe)
   const setupMediaPipe = useCallback(async () => {
+      if (!canStartCamera(useDrivingStore.getState().testSession)) return;
       setIsSettingUpVision(true);
       setCameraError(null);
       setDebugInfo("Loading AI Models...");
@@ -282,12 +300,13 @@ export default function VisionController({
         objectDetectorRef.current = null;
         setVisionReady(false);
         setRecoveryKind("vision-error");
+        recordTestSessionEvent("vision_initialization_failed", { failureCategory: "vision-initialization" });
         setCameraError("Vision setup failed. Retry vision setup or use keyboard pedals to continue.");
         setDebugInfo("Vision setup error: " + String(error));
       } finally {
         setIsSettingUpVision(false);
       }
-  }, [setCameraError, setDebugInfo, setVisionReady, startCamera]);
+  }, [recordTestSessionEvent, setCameraError, setDebugInfo, setVisionReady, startCamera]);
 
   const retryRecovery = useCallback(() => {
     setCameraError(null);

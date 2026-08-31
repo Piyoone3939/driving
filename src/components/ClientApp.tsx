@@ -14,6 +14,7 @@ import { auth } from '@/lib/firebase';
 import { TutorialScreen } from '@/components/ui/TutorialScreen';
 import { LanguageScreen } from '@/components/ui/LanguageScreen';
 import { OrientationGate } from '@/components/ui/OrientationGate';
+import { CameraConsent } from '@/components/ui/CameraConsent';
 
 const VisionController = dynamic(() => import('@/components/vision/VisionController'), { ssr: false });
 const Scene = dynamic(() => import('@/components/simulation/Scene').then(mod => mod.Scene), { ssr: false });
@@ -197,6 +198,9 @@ export default function ClientApp() {
   const setMisssionState = useDrivingStore(state => state.setMissionState);
   const language = useDrivingStore(state => state.language);
   const t = STRINGS[language];
+  const testSession = useDrivingStore(state => state.testSession);
+  const cameraProcessingAllowed = useDrivingStore(state => state.cameraProcessingAllowed);
+  const startTestSession = useDrivingStore(state => state.startTestSession);
 
   useDrivingFeedback(); // Activate Feedback Logic
 
@@ -212,7 +216,7 @@ export default function ClientApp() {
     if ((e.target as HTMLElement).closest('button')) {
       return;
     }
-    if (screen === 'driving'){
+    if (screen === 'driving' && testSession){
       setIsPaused(!isPaused);
     }
   };
@@ -226,7 +230,7 @@ export default function ClientApp() {
           <UserProfileHeader />
 
           {/* Pause Overlay */}
-          {screen === 'driving' && isPaused && (
+          {screen === 'driving' && testSession && isPaused && (
             <div style={{
               position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
               backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -271,8 +275,10 @@ export default function ClientApp() {
           {screen === 'tutorial' && <OrientationGate><TutorialScreen /></OrientationGate>}
           {screen === 'driving' && (
               <OrientationGate>
-              <>
-                <VisionController isPaused={isPaused} />
+              {!testSession ? <div className="flex h-full items-center justify-center bg-slate-900 p-4">
+                <CameraConsent language={language} onChoose={startTestSession} onDecline={handleGoHome} />
+              </div> : <>
+                {cameraProcessingAllowed && <VisionController isPaused={isPaused} />}
                 <MissionOverlay />
                 <KeyboardControls />
                 <Dashboard />
@@ -297,7 +303,7 @@ export default function ClientApp() {
                         <Scene />
                     </Suspense>
                 </div>
-              </>
+              </>}
               </OrientationGate>
           )}
 

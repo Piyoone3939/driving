@@ -11,7 +11,9 @@
   "include": [
     "src/lib/guidedTrainingContract.ts",
     "src/lib/onboardingRecovery.ts",
+    "src/lib/testSession.ts",
     "tests/guided-training-regression.test.ts",
-    "tests/onboarding-recovery.test.ts"
+    "tests/onboarding-recovery.test.ts",
+    "tests/test-session.test.ts"
   ]
 }
